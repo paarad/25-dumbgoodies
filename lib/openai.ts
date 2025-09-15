@@ -2,11 +2,12 @@ import OpenAI from "openai";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-if (!OPENAI_API_KEY) {
-	console.warn("[openai] OPENAI_API_KEY is not set. Some features will fail.");
+export function getOpenAI(): OpenAI {
+	if (!OPENAI_API_KEY) {
+		throw new Error("Missing OPENAI_API_KEY");
+	}
+	return new OpenAI({ apiKey: OPENAI_API_KEY });
 }
-
-export const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 export type GeneratedImage = {
 	imageBuffer: Buffer;
@@ -14,7 +15,7 @@ export type GeneratedImage = {
 };
 
 export async function generateBaseImage(prompt: string): Promise<GeneratedImage> {
-	const resp = await openai.images.generate({
+	const resp = await getOpenAI().images.generate({
 		model: "gpt-image-1",
 		prompt,
 		size: "1024x1024",

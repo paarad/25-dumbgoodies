@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { openai } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
 import { proposeIdeas } from "@/lib/prompts";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		const sys = proposeIdeas(brand);
-		const chat = await openai.chat.completions.create({
+		const chat = await getOpenAI().chat.completions.create({
 			model: "gpt-4o-mini",
 			messages: [
 				{ role: "system", content: sys },
