@@ -6,8 +6,6 @@ import { IdeaCard } from "@/components/IdeaCard";
 
 type RenderResult = { model: "v1-seedream" | "v1_5-openai"; imageUrl: string; thumbnailUrl: string };
 
-enum ModelLabel {}
-
 export default function HomePage() {
 	const [projectId, setProjectId] = useState<string | null>(null);
 	const [concepts, setConcepts] = useState<Array<{ id: string; label: string; prompt_base: string }>>([]);
@@ -41,8 +39,8 @@ export default function HomePage() {
 					body: JSON.stringify({ brand: params.brand, logoUrl }),
 				});
 				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || "Propose failed");
-				conceptsLocal = data.concepts;
+				if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
+				conceptsLocal = (data as { concepts: { id: string; label: string; prompt_base: string }[] }).concepts;
 				createdProjectId = res.headers.get("x-project-id") || crypto.randomUUID();
 			} else {
 				// Create a project and a single concept for the guided product
@@ -74,9 +72,9 @@ export default function HomePage() {
 							promptBase: c.prompt_base,
 						}),
 					});
-					const data = (await res.json()) as { results: RenderResult[] };
-					if (!res.ok) throw new Error((data as any).error || "Render failed");
-					return [c.id, data.results] as const;
+					const json = (await res.json()) as { results?: RenderResult[]; error?: string };
+					if (!res.ok || !json.results) throw new Error(json.error || "Render failed");
+					return [c.id, json.results] as const;
 				})
 			);
 			setResultsByConcept(Object.fromEntries(entries));
