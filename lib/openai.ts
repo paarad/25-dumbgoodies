@@ -35,8 +35,8 @@ export async function editImageWithMask(params: {
 	const form = new FormData();
 	form.append("model", "gpt-image-1");
 	form.append("prompt", params.prompt ?? params.instruction);
-	form.append("image", new Blob([params.image], { type: "image/png" }), "image.png");
-	form.append("mask", new Blob([params.mask], { type: "image/png" }), "mask.png");
+	form.append("image", new Blob([new Uint8Array(params.image)], { type: "image/png" }), "image.png");
+	form.append("mask", new Blob([new Uint8Array(params.mask)], { type: "image/png" }), "mask.png");
 	form.append("size", "1024x1024");
 	form.append("response_format", "b64_json");
 

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { seedreamGenerateBase, seedreamEditWithMask } from "@/lib/seedream";
-import { editImageWithMask, generateBaseImage } from "@/lib/openai";
+import { editImageWithMask } from "@/lib/openai";
 import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng } from "@/lib/images";
 import { uploadBufferToStorage } from "@/lib/supabase";
 

@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
-import { randomUUID } from "node:crypto";
 
 export const runtime = "edge";
 
@@ -21,7 +20,7 @@ export async function POST(req: NextRequest) {
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
 		const { projectId, conceptId, model, imageUrl, thumbnailUrl } = parsed.data;
-		const id = randomUUID();
+		const id = globalThis.crypto.randomUUID();
 		const { error } = await supabaseAdmin.from("renders").insert({
 			id,
 			project_id: projectId,

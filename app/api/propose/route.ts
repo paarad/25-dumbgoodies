@@ -3,7 +3,6 @@ import { z } from "zod";
 import { openai } from "@/lib/openai";
 import { proposeIdeas } from "@/lib/prompts";
 import { supabaseAdmin } from "@/lib/supabase";
-import { randomUUID } from "node:crypto";
 
 export const runtime = "edge";
 
@@ -47,10 +46,10 @@ export async function POST(req: NextRequest) {
 			return new Response(JSON.stringify({ error: "Bad ideas response" }), { status: 500 });
 		}
 
-		const projectId = randomUUID();
+		const projectId = globalThis.crypto.randomUUID();
 		await supabaseAdmin.from("projects").insert({ id: projectId, brand });
 
-		const concepts = ideas.map((i) => ({ id: randomUUID(), label: i.label, prompt_base: i.prompt_base }));
+		const concepts = ideas.map((i) => ({ id: globalThis.crypto.randomUUID(), label: i.label, prompt_base: i.prompt_base }));
 		await supabaseAdmin.from("concepts").insert(
 			concepts.map((c) => ({ id: c.id, project_id: projectId, label: c.label, prompt_base: c.prompt_base, status: "idea" }))
 		);
