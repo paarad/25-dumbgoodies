@@ -1,5 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+export const BUCKET_UPLOADS = "dumbgoodies_uploads";
+export const BUCKET_RENDERS = "dumbgoodies_renders";
+export const BUCKET_THUMBS = "dumbgoodies_thumbs";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

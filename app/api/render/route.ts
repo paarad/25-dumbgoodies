@@ -3,7 +3,7 @@ import { z } from "zod";
 import { seedreamGenerateBase, seedreamEditWithMask } from "@/lib/seedream";
 import { editImageWithMask } from "@/lib/openai";
 import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng } from "@/lib/images";
-import { uploadBufferToStorage } from "@/lib/supabase";
+import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -63,7 +63,7 @@ async function persistRender(params: { projectId: string; conceptId: string; mod
 	const png = await toPng(params.data);
 	const thumb = await createThumbnail(png, 512);
 	const basePath = `${new Date().toISOString().slice(0, 10)}/${params.projectId}/${params.conceptId}/${params.model}`;
-	const imageUrl = await uploadBufferToStorage({ bucket: "renders", path: `${basePath}.png`, data: png, contentType: "image/png" });
-	const thumbnailUrl = await uploadBufferToStorage({ bucket: "thumbs", path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
+	const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
+	const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
 	return { model: params.model as "v1-seedream" | "v1_5-openai", imageUrl, thumbnailUrl };
 } 

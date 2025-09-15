@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { toPng } from "@/lib/images";
-import { uploadBufferToStorage } from "@/lib/supabase";
+import { BUCKET_UPLOADS, uploadBufferToStorage } from "@/lib/supabase";
 import crypto from "node:crypto";
 
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 		const id = crypto.randomUUID();
 		const path = `${new Date().toISOString().slice(0, 10)}/${id}.png`;
 		const url = await uploadBufferToStorage({
-			bucket: "uploads",
+			bucket: BUCKET_UPLOADS,
 			path,
 			data: pngBuffer,
 			contentType: "image/png",
