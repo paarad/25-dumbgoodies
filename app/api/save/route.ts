@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
 		});
 		if (error) throw error;
 		return new Response(JSON.stringify({ ok: true, renderId: id }), { status: 200, headers: { "content-type": "application/json" } });
-	} catch (err: any) {
+	} catch (err) {
 		console.error("/api/save error", err);
-		return new Response(JSON.stringify({ error: err?.message ?? "Save failed" }), { status: 500 });
+		return new Response(JSON.stringify({ error: "Save failed" }), { status: 500 });
 	}
 } 

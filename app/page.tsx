@@ -4,10 +4,14 @@ import { useState } from "react";
 import { BrandInput } from "@/components/BrandInput";
 import { IdeaCard } from "@/components/IdeaCard";
 
+type RenderResult = { model: "v1-seedream" | "v1_5-openai"; imageUrl: string; thumbnailUrl: string };
+
+enum ModelLabel {}
+
 export default function HomePage() {
 	const [projectId, setProjectId] = useState<string | null>(null);
 	const [concepts, setConcepts] = useState<Array<{ id: string; label: string; prompt_base: string }>>([]);
-	const [resultsByConcept, setResultsByConcept] = useState<Record<string, any[]>>({});
+	const [resultsByConcept, setResultsByConcept] = useState<Record<string, RenderResult[]>>({});
 	const [loading, setLoading] = useState(false);
 
 	async function handleStart(params: {
@@ -70,8 +74,8 @@ export default function HomePage() {
 							promptBase: c.prompt_base,
 						}),
 					});
-					const data = await res.json();
-					if (!res.ok) throw new Error(data.error || "Render failed");
+					const data = (await res.json()) as { results: RenderResult[] };
+					if (!res.ok) throw new Error((data as any).error || "Render failed");
 					return [c.id, data.results] as const;
 				})
 			);
@@ -111,6 +115,6 @@ async function uploadFile(file: File): Promise<string> {
 	fd.append("file", file);
 	const res = await fetch("/api/upload", { method: "POST", body: fd });
 	const data = await res.json();
-	if (!res.ok) throw new Error(data.error || "Upload failed");
-	return data.url as string;
+	if (!res.ok) throw new Error((data as { error?: string }).error || "Upload failed");
+	return (data as { url: string }).url;
 }

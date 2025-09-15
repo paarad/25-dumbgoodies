@@ -35,12 +35,15 @@ export async function POST(req: NextRequest) {
 			],
 			response_format: { type: "json_object" },
 		});
-		const content = chat.choices[0]?.message?.content ?? "{}";
-		let ideas: Array<{ label: string; prompt_base: string }>; 
+		const content = chat.choices[0]?.message?.content ?? "[]";
+		let ideas: Array<{ label: string; prompt_base: string }> = [];
 		try {
-			ideas = JSON.parse(content);
+			const parsedJson = JSON.parse(content) as unknown;
+			if (Array.isArray(parsedJson)) {
+				ideas = parsedJson as Array<{ label: string; prompt_base: string }>;
+			}
 		} catch {
-			ideas = [] as any;
+			ideas = [];
 		}
 		if (!Array.isArray(ideas) || ideas.length !== 2) {
 			return new Response(JSON.stringify({ error: "Bad ideas response" }), { status: 500 });
@@ -58,8 +61,8 @@ export async function POST(req: NextRequest) {
 			JSON.stringify({ concepts }),
 			{ status: 200, headers: { "content-type": "application/json", "x-project-id": projectId } }
 		);
-	} catch (err: any) {
+	} catch (err) {
 		console.error("/api/propose error", err);
-		return new Response(JSON.stringify({ error: err?.message ?? "Propose failed" }), { status: 500 });
+		return new Response(JSON.stringify({ error: "Propose failed" }), { status: 500 });
 	}
 } 

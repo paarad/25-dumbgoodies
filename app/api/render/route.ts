@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 		if (!parsed.success) {
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
-		const { projectId, conceptId, brand, logoUrl, productRefUrl, promptBase } = parsed.data;
+		const { projectId, conceptId, brand, productRefUrl, promptBase } = parsed.data;
 
 		// Build or fetch base image
 		let baseBuffer: Buffer;
@@ -53,9 +53,9 @@ export async function POST(req: NextRequest) {
 			JSON.stringify({ results }),
 			{ status: 200, headers: { "content-type": "application/json" } }
 		);
-	} catch (err: any) {
+	} catch (err) {
 		console.error("/api/render error", err);
-		return new Response(JSON.stringify({ error: err?.message ?? "Render failed" }), { status: 500 });
+		return new Response(JSON.stringify({ error: "Render failed" }), { status: 500 });
 	}
 }
 

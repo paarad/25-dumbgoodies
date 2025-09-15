@@ -10,7 +10,7 @@ Return JSON:
 ]
 No prose.`;
 
-export const seedreamPrompt = ({ brand, promptBase, withLogo }: {
+export const seedreamPrompt = ({ brand, promptBase, withLogo: _withLogo }: {
 	brand: string; promptBase: string; withLogo: boolean;
 }) => `
 Photorealistic studio product shot. ${promptBase}

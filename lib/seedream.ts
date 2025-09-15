@@ -2,7 +2,7 @@ import type { GeneratedImage } from "./openai";
 import { generateBaseImage as openaiGenerate, editImageWithMask as openaiEdit } from "./openai";
 import { openaiEditInstruction } from "./prompts";
 
-const SEEDREAM_API_KEY = process.env.SEEDREAM_API_KEY;
+const _SEEDREAM_API_KEY = process.env.SEEDREAM_API_KEY;
 
 export async function seedreamGenerateBase(prompt: string): Promise<GeneratedImage> {
 	// TODO: Integrate real Seedream 4.0 generation API.

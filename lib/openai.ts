@@ -40,7 +40,6 @@ export async function editImageWithMask(params: {
 	form.append("size", "1024x1024");
 	form.append("response_format", "b64_json");
 
-	// SDK does not yet expose a high-level helper for edits with buffers; use fetch directly
 	const res = await fetch("https://api.openai.com/v1/images/edits", {
 		method: "POST",
 		headers: {
@@ -52,7 +51,8 @@ export async function editImageWithMask(params: {
 		const text = await res.text();
 		throw new Error(`OpenAI edit failed: ${res.status} ${text}`);
 	}
-	const json: any = await res.json();
+	type EditJson = { data?: Array<{ b64_json?: string }> };
+	const json = (await res.json()) as EditJson;
 	const b64 = json?.data?.[0]?.b64_json;
 	if (!b64) throw new Error("OpenAI edit returned no image");
 	return { imageBuffer: Buffer.from(b64, "base64"), mimeType: "image/png" };
