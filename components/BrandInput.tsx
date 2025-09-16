@@ -34,38 +34,39 @@ export function BrandInput({ onSubmit }: Props) {
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="flex flex-col gap-3">
-			<div>
-				<label className="block text-sm mb-1">Brand name</label>
+		<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+			<div className="flex items-stretch gap-2">
 				<input
 					value={brand}
 					onChange={(e) => setBrand(e.target.value)}
-					placeholder="DumbGoodies"
-					className="w-full rounded-md border px-3 py-2"
+					placeholder="Brand name (e.g., DumbGoodies)"
+					className="flex-1 input-neutral"
 					required
 				/>
+				<input ref={logoRef} type="file" accept="image/png,image/svg+xml" className="hidden" id="logo-input" />
+				<label htmlFor="logo-input" className="button-secondary">
+					Logo
+				</label>
+				<button disabled={submitting} className="button-primary">
+					{submitting ? "Working..." : "Go"}
+				</button>
 			</div>
-			<div>
-				<label className="block text-sm mb-1">Logo (PNG/SVG)</label>
-				<input ref={logoRef} type="file" accept="image/png,image/svg+xml" className="w-full" />
-			</div>
-			<div>
-				<label className="block text-sm mb-1">Optional: product name</label>
+			
+			<div className="flex items-stretch gap-2">
 				<input
 					value={productHint}
 					onChange={(e) => setProductHint(e.target.value)}
-					placeholder="e.g., mug"
-					className="w-full rounded-md border px-3 py-2"
+					placeholder="Optional: product name (e.g., mug, t-shirt)"
+					className="flex-1 input-neutral"
 				/>
+				<input ref={productRef} type="file" accept="image/*" className="hidden" id="product-input" />
+				<label htmlFor="product-input" className="button-secondary">
+					Product Photo
+				</label>
 			</div>
-			<div>
-				<label className="block text-sm mb-1">Optional: product reference photo</label>
-				<input ref={productRef} type="file" accept="image/*" className="w-full" />
-			</div>
-			<div>
-				<button disabled={submitting} className="px-4 py-2 rounded-md bg-gray-900 text-white hover:bg-black disabled:opacity-60">
-					{submitting ? "Working..." : "Go"}
-				</button>
+			
+			<div className="text-xs opacity-70">
+				Leave product fields empty to auto-generate 2 dumb ideas • Upload files for guided rendering
 			</div>
 		</form>
 	);

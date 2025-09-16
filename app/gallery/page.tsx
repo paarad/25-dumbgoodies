@@ -4,7 +4,7 @@ export const revalidate = 0;
 
 async function fetchRenders() {
 	const { data, error } = await getSupabaseAnon()
-		.from("renders")
+		.from("dumbgoodies_renders")
 		.select("id, image_url, thumbnail_url, model, created_at")
 		.eq("public", true)
 		.order("created_at", { ascending: false })
@@ -16,16 +16,28 @@ async function fetchRenders() {
 export default async function GalleryPage() {
 	const renders = await fetchRenders();
 	return (
-		<main className="max-w-6xl mx-auto px-4 py-8">
-			<h1 className="text-2xl font-semibold mb-4">Gallery</h1>
-			<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+		<div className="font-sans min-h-screen p-6 sm:p-10 max-w-6xl mx-auto flex flex-col gap-8">
+			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
+				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight">Gallery</h1>
+				<p className="mt-3 text-sm sm:text-base opacity-80">Public collection of generated dumb goodies from the community.</p>
+			</section>
+
+			<section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
 				{renders.map((r) => (
 					<a key={r.id} href={r.image_url} target="_blank" className="block group">
-						<img src={r.thumbnail_url ?? r.image_url} alt={r.model} className="w-full h-auto rounded-md" />
-						<div className="mt-1 text-xs text-gray-600">{r.model}</div>
+						<div className="rounded-lg border border-black/10 dark:border-white/10 p-2 bg-white dark:bg-black/20 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+							<img src={r.thumbnail_url ?? r.image_url} alt={r.model} className="w-full h-auto rounded-md bg-gray-50 dark:bg-gray-800" />
+							<div className="mt-2 text-xs opacity-70 font-medium">{r.model}</div>
+						</div>
 					</a>
 				))}
-			</div>
-		</main>
+			</section>
+
+			{renders.length === 0 && (
+				<section className="text-center py-16">
+					<div className="text-sm opacity-70">No renders yet. Be the first to create some dumb goodies!</div>
+				</section>
+			)}
+		</div>
 	);
 } 

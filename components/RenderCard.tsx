@@ -34,23 +34,23 @@ export function RenderCard({ projectId, conceptId, model, imageUrl, thumbnailUrl
 	}
 
 	return (
-		<div className="rounded-lg border p-3 flex flex-col gap-2">
-			<div className="text-xs text-gray-600">{model === "v1-seedream" ? "v1 Seedream" : "v1.5 OpenAI"}</div>
+		<div className="rounded-lg border border-black/10 dark:border-white/10 p-3 flex flex-col gap-3 bg-white dark:bg-black/20">
+			<div className="text-xs opacity-70 font-medium">{model === "v1-seedream" ? "v1 Seedream" : "v1.5 OpenAI"}</div>
 			<a href={imageUrl} target="_blank" rel="noreferrer" className="block">
-				<img src={thumbnailUrl ?? imageUrl} alt={model} className="w-full h-auto rounded-md bg-gray-50" />
+				<img src={thumbnailUrl ?? imageUrl} alt={model} className="w-full h-auto rounded-md bg-gray-50 dark:bg-gray-800" />
 			</a>
 			<div className="flex items-center gap-2">
 				<a
 					href={imageUrl}
 					download
-					className="px-3 py-1.5 text-sm rounded-md bg-gray-900 text-white hover:bg-black"
+					className="button-primary flex-1 justify-center text-center"
 				>
 					Download
 				</a>
 				<button
 					onClick={onSave}
 					disabled={saving || !!savedId}
-					className="px-3 py-1.5 text-sm rounded-md border hover:bg-gray-50 disabled:opacity-60"
+					className="button-secondary flex-1 justify-center"
 				>
 					{savedId ? "Saved" : saving ? "Saving..." : "Save"}
 				</button>

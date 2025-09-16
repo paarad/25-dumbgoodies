@@ -87,24 +87,49 @@ export default function HomePage() {
 	}
 
 	return (
-		<main className="max-w-5xl mx-auto px-4 py-8">
-			<h1 className="text-2xl font-semibold mb-4">DumbGoodies — Competition</h1>
-			<div className="rounded-xl border p-4 mb-6">
+		<div className="font-sans min-h-screen p-6 sm:p-10 max-w-5xl mx-auto flex flex-col gap-8">
+			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
+				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight">DumbGoodies</h1>
+				<p className="mt-3 text-sm sm:text-base opacity-80">Generate dumb merch images from your logo or brand name with AI competition mode.</p>
+			</section>
+
+			<section className="card-neutral">
 				<BrandInput onSubmit={handleStart} />
-			</div>
-			{loading && <div className="text-sm text-gray-600">Rendering...</div>}
-			<div className="grid grid-cols-1 gap-6">
-				{concepts.map((c) => (
-					<IdeaCard
-						key={c.id}
-						projectId={projectId ?? ""}
-						conceptId={c.id}
-						label={c.label}
-						results={resultsByConcept[c.id]}
-					/>
-				))}
-			</div>
-		</main>
+			</section>
+
+			{loading && (
+				<section className="text-center">
+					<div className="text-sm opacity-70">Rendering your dumb goodies...</div>
+				</section>
+			)}
+
+			{concepts.length > 0 && (
+				<section className="grid gap-6">
+					{concepts.map((c) => (
+						<IdeaCard
+							key={c.id}
+							projectId={projectId ?? ""}
+							conceptId={c.id}
+							label={c.label}
+							results={resultsByConcept[c.id]}
+						/>
+					))}
+				</section>
+			)}
+
+			{!loading && concepts.length === 0 && (
+				<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
+					<div className="card-neutral">
+						<h3 className="font-medium">AI Competition</h3>
+						<p className="text-sm opacity-80 mt-1">Compare Seedream 4.0 vs OpenAI gpt-image-1 side-by-side for each concept.</p>
+					</div>
+					<div className="card-neutral">
+						<h3 className="font-medium">Smart Placement</h3>
+						<p className="text-sm opacity-80 mt-1">Logos are intelligently placed with proper perspective and realistic materials.</p>
+					</div>
+				</section>
+			)}
+		</div>
 	);
 }
 

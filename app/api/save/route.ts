@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 		}
 		const { projectId, conceptId, model, imageUrl, thumbnailUrl } = parsed.data;
 		const id = globalThis.crypto.randomUUID();
-		const { error } = await getSupabaseAdmin().from("renders").insert({
+		const { error } = await getSupabaseAdmin().from("dumbgoodies_renders").insert({
 			id,
 			project_id: projectId,
 			concept_id: conceptId,

@@ -50,10 +50,10 @@ export async function POST(req: NextRequest) {
 		}
 
 		const projectId = globalThis.crypto.randomUUID();
-		await getSupabaseAdmin().from("projects").insert({ id: projectId, brand });
+		await getSupabaseAdmin().from("dumbgoodies_projects").insert({ id: projectId, brand });
 
 		const concepts = ideas.map((i) => ({ id: globalThis.crypto.randomUUID(), label: i.label, prompt_base: i.prompt_base }));
-		await getSupabaseAdmin().from("concepts").insert(
+		await getSupabaseAdmin().from("dumbgoodies_concepts").insert(
 			concepts.map((c) => ({ id: c.id, project_id: projectId, label: c.label, prompt_base: c.prompt_base, status: "idea" }))
 		);
 

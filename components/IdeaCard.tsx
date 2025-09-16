@@ -15,8 +15,8 @@ type Props = {
 
 export function IdeaCard({ projectId, conceptId, label, results }: Props) {
 	return (
-		<div className="rounded-xl border p-4">
-			<div className="mb-3 font-medium">{label}</div>
+		<div className="card-neutral">
+			<div className="mb-4 font-medium">{label}</div>
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 				{results?.map((r) => (
 					<RenderCard
