@@ -15,12 +15,16 @@ export type GeneratedImage = {
 };
 
 export async function generateBaseImage(prompt: string): Promise<GeneratedImage> {
+	console.log("[OpenAI] Generating base image with DALL-E 3:", prompt);
+	
 	const resp = await getOpenAI().images.generate({
-		model: "gpt-image-1",
-		prompt,
+		model: "dall-e-3",
+		prompt: `Product photography: ${prompt}. Clean studio background, professional lighting, centered composition, high quality, commercial product shot`,
 		size: "1024x1024",
+		quality: "standard",
 		response_format: "b64_json",
 	});
+	
 	const first = resp.data?.[0];
 	const b64 = first?.b64_json;
 	if (!b64) throw new Error("OpenAI generation returned empty response");
@@ -33,8 +37,10 @@ export async function editImageWithMask(params: {
 	instruction: string;
 	prompt?: string;
 }): Promise<GeneratedImage> {
+	console.log("[OpenAI] Editing image with instruction:", params.instruction);
+	
 	const form = new FormData();
-	form.append("model", "gpt-image-1");
+	form.append("model", "dall-e-2"); // Note: DALL-E 2 for editing, DALL-E 3 doesn't support editing yet
 	form.append("prompt", params.prompt ?? params.instruction);
 	form.append("image", new Blob([new Uint8Array(params.image)], { type: "image/png" }), "image.png");
 	form.append("mask", new Blob([new Uint8Array(params.mask)], { type: "image/png" }), "mask.png");

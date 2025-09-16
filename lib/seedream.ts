@@ -2,7 +2,9 @@ import Replicate from "replicate";
 import type { GeneratedImage } from "./openai";
 
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
-const REPLICATE_MODEL = process.env.REPLICATE_MODEL || "bytedance/seedream-4";
+// Using Stable Diffusion XL for inpainting instead of Seedream
+const REPLICATE_MODEL = process.env.REPLICATE_MODEL || "stability-ai/stable-diffusion-xl-base-1.0";
+const INPAINTING_MODEL = "stability-ai/sdxl-inpainting";
 
 function getReplicate(): Replicate {
 	if (!REPLICATE_API_TOKEN) {
@@ -11,119 +13,42 @@ function getReplicate(): Replicate {
 	return new Replicate({ auth: REPLICATE_API_TOKEN });
 }
 
-// Helper to handle Replicate output (ReadableStream or URL)
-async function extractImageFromOutput(output: any): Promise<string> {
-	console.log("[Seedream] Processing output:", output);
-	console.log("[Seedream] Output type:", typeof output);
-	console.log("[Seedream] Is array:", Array.isArray(output));
-
-	// Handle array output (get first item)
-	if (Array.isArray(output)) {
-		output = output[0];
-	}
-
-	// Handle ReadableStream
-	if (output && typeof output === "object" && output.constructor && output.constructor.name === "ReadableStream") {
-		console.log("[Seedream] Handling ReadableStream");
-		const reader = output.getReader();
-		const chunks: Uint8Array[] = [];
-		
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				chunks.push(value);
-			}
-		} finally {
-			reader.releaseLock();
-		}
-		
-		// Combine chunks and convert to text (should be URL)
-		const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-		const combined = new Uint8Array(totalLength);
-		let offset = 0;
-		for (const chunk of chunks) {
-			combined.set(chunk, offset);
-			offset += chunk.length;
-		}
-		
-		const text = new TextDecoder().decode(combined).trim();
-		console.log("[Seedream] Stream decoded to:", text);
-		return text;
-	}
-
-	// Handle direct string URL
-	if (typeof output === "string") {
-		console.log("[Seedream] Direct string URL:", output);
-		return output;
-	}
-
-	// Handle object with url/image property
-	if (output && typeof output === "object") {
-		// Check if url property exists and is a string
-		if ("url" in output && typeof output.url === "string") {
-			console.log("[Seedream] Object with url string:", output.url);
-			return output.url;
-		}
-		// Check if url property exists but is a function (call it)
-		if ("url" in output && typeof output.url === "function") {
-			console.log("[Seedream] Object with url function, calling it...");
-			try {
-				const result = output.url();
-				console.log("[Seedream] url() returned:", result);
-				if (typeof result === "string") {
-					return result;
-				}
-			} catch (error) {
-				console.error("[Seedream] Error calling url():", error);
-			}
-		}
-		// Check if image property exists and is a string
-		if ("image" in output && typeof output.image === "string") {
-			console.log("[Seedream] Object with image string:", output.image);
-			return output.image;
-		}
-		// Check if image property exists but is a function (call it)
-		if ("image" in output && typeof output.image === "function") {
-			console.log("[Seedream] Object with image function, calling it...");
-			try {
-				const result = output.image();
-				console.log("[Seedream] image() returned:", result);
-				if (typeof result === "string") {
-					return result;
-				}
-			} catch (error) {
-				console.error("[Seedream] Error calling image():", error);
-			}
-		}
-	}
-
-	throw new Error(`Unsupported Replicate output format: ${typeof output} - ${JSON.stringify(output)}`);
-}
-
-export async function seedreamGenerateBase(prompt: string): Promise<GeneratedImage> {
+export async function stableDiffusionGenerateBase(prompt: string): Promise<GeneratedImage> {
 	const replicate = getReplicate();
 	
-	console.log("[Seedream] Generating with prompt:", prompt);
+	console.log("[StableDiffusion] Generating base image with prompt:", prompt);
 	
-	// Generate base product image using Seedream
+	const enhancedPrompt = `Product photography of ${prompt}, clean white background, professional studio lighting, centered composition, high quality, commercial product shot, 4k`;
+	
+	// Generate base product image using Stable Diffusion XL
 	const output = await replicate.run(REPLICATE_MODEL as any, {
 		input: {
-			prompt: prompt,
-			guidance_scale: 7.5,
-			num_inference_steps: 20,
+			prompt: enhancedPrompt,
 			width: 1024,
 			height: 1024,
+			num_inference_steps: 30,
+			guidance_scale: 7.5,
+			num_outputs: 1,
 		},
 	});
 
-	const imageUrl = await extractImageFromOutput(output);
-
-	if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
-		throw new Error(`Invalid image URL from Seedream: ${typeof imageUrl} - ${imageUrl}`);
+	console.log("[StableDiffusion] Raw output:", output);
+	
+	// Handle output - should be array of URLs
+	let imageUrl: string;
+	if (Array.isArray(output) && output.length > 0) {
+		imageUrl = output[0];
+	} else if (typeof output === "string") {
+		imageUrl = output;
+	} else {
+		throw new Error(`Unexpected Stable Diffusion output format: ${typeof output}`);
 	}
 
-	console.log("[Seedream] Using image URL:", imageUrl);
+	if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+		throw new Error(`Invalid image URL from Stable Diffusion: ${typeof imageUrl} - ${imageUrl}`);
+	}
+
+	console.log("[StableDiffusion] Using image URL:", imageUrl);
 
 	// Fetch the image and convert to buffer
 	const response = await fetch(imageUrl);
@@ -135,7 +60,7 @@ export async function seedreamGenerateBase(prompt: string): Promise<GeneratedIma
 	return { imageBuffer, mimeType: "image/png" };
 }
 
-export async function seedreamEditWithMask(params: {
+export async function stableDiffusionInpaint(params: {
 	image: Buffer;
 	mask: Buffer;
 	brand: string;
@@ -147,33 +72,49 @@ export async function seedreamEditWithMask(params: {
 	const imageDataUrl = `data:image/png;base64,${params.image.toString("base64")}`;
 	const maskDataUrl = `data:image/png;base64,${params.mask.toString("base64")}`;
 	
-	const editPrompt = `Add "${params.brand}" branding to this product. ${params.promptBase}`;
+	const inpaintPrompt = `Add "${params.brand}" logo or branding to this ${params.promptBase}. Professional product photography, clean integration, realistic lighting and perspective`;
 	
-	console.log("[Seedream] Editing with prompt:", editPrompt);
+	console.log("[StableDiffusion] Inpainting with prompt:", inpaintPrompt);
 	
-	// Use Seedream for inpainting/editing
-	const output = await replicate.run(REPLICATE_MODEL as any, {
+	// Use Stable Diffusion XL Inpainting for precise logo placement
+	const output = await replicate.run(INPAINTING_MODEL as any, {
 		input: {
-			prompt: editPrompt,
+			prompt: inpaintPrompt,
 			image: imageDataUrl,
 			mask: maskDataUrl,
+			num_inference_steps: 30,
 			guidance_scale: 7.5,
-			num_inference_steps: 20,
 			strength: 0.8,
+			num_outputs: 1,
 		},
 	});
 
-	const imageUrl = await extractImageFromOutput(output);
+	console.log("[StableDiffusion] Inpaint output:", output);
+
+	// Handle output same as generation
+	let imageUrl: string;
+	if (Array.isArray(output) && output.length > 0) {
+		imageUrl = output[0];
+	} else if (typeof output === "string") {
+		imageUrl = output;
+	} else {
+		throw new Error(`Unexpected Stable Diffusion inpaint output format: ${typeof output}`);
+	}
 
 	if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
-		throw new Error(`Invalid image URL from Seedream edit: ${typeof imageUrl} - ${imageUrl}`);
+		throw new Error(`Invalid image URL from Stable Diffusion inpaint: ${typeof imageUrl} - ${imageUrl}`);
 	}
 
 	const response = await fetch(imageUrl);
 	if (!response.ok) {
-		throw new Error(`Failed to fetch edited image: ${response.status}`);
+		throw new Error(`Failed to fetch inpainted image: ${response.status}`);
 	}
 	
 	const imageBuffer = Buffer.from(await response.arrayBuffer());
 	return { imageBuffer, mimeType: "image/png" };
-} 
+
+}
+
+// Keep old function names for compatibility but use new implementations
+export const seedreamGenerateBase = stableDiffusionGenerateBase;
+export const seedreamEditWithMask = stableDiffusionInpaint; 

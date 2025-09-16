@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { seedreamGenerateBase, seedreamEditWithMask } from "@/lib/seedream";
-import { editImageWithMask } from "@/lib/openai";
+import { seedreamEditWithMask } from "@/lib/seedream";
+import { generateBaseImage, editImageWithMask } from "@/lib/openai";
 import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
 
@@ -25,98 +25,100 @@ export async function POST(req: NextRequest) {
 		}
 		const { projectId, conceptId, brand, productRefUrl, promptBase } = parsed.data;
 
-		// Build or fetch base image
+		// Build or fetch base image - now using DALL-E 3 as primary
 		let baseBuffer: Buffer;
 		if (productRefUrl) {
 			console.log("[Render] Using product reference image:", productRefUrl);
 			baseBuffer = await bufferFromUrl(productRefUrl);
 		} else {
-			console.log("[Render] Generating base image with Seedream...");
-			const base = await seedreamGenerateBase(promptBase);
+			console.log("[Render] Generating base image with DALL-E 3...");
+			const base = await generateBaseImage(promptBase);
 			baseBuffer = base.imageBuffer;
 		}
 
 		// Build mask (simple centered patch for now)
 		const maskBuffer = buildCenteredLabelMask(1024, 1024);
 
-		// Run both models with individual error handling
-		console.log("[Render] Starting parallel rendering with both models...");
+		// Run both inpainting models with individual error handling
+		console.log("[Render] Starting parallel logo placement with both models...");
 		
-		const seedreamPromise = seedreamEditWithMask({ 
+		// Model 1: Stable Diffusion XL Inpainting (better for logo placement)
+		const stableDiffusionPromise = seedreamEditWithMask({ 
 			image: baseBuffer, 
 			mask: maskBuffer, 
 			brand, 
 			promptBase 
 		}).then(result => ({ success: true, result }))
 		.catch(error => {
-			console.error("[Render] Seedream edit failed:", error);
+			console.error("[Render] Stable Diffusion inpainting failed:", error);
 			return { success: false, error: error.message };
 		});
 
-		const openaiPromise = editImageWithMask({ 
+		// Model 2: DALL-E 2 Inpainting (reliable fallback)
+		const dallePromise = editImageWithMask({ 
 			image: baseBuffer, 
 			mask: maskBuffer, 
-			instruction: `Place ${brand} logo` 
+			instruction: `Place "${brand}" logo or branding on this product with professional integration. Clean, realistic placement that matches the product's perspective and lighting.` 
 		}).then(result => ({ success: true, result }))
 		.catch(error => {
-			console.error("[Render] OpenAI edit failed:", error);
+			console.error("[Render] DALL-E 2 inpainting failed:", error);
 			return { success: false, error: error.message };
 		});
 
-		const [seedreamResult, openaiResult] = await Promise.all([seedreamPromise, openaiPromise]);
+		const [stableDiffusionResult, dalleResult] = await Promise.all([stableDiffusionPromise, dallePromise]);
 
 		// Process successful results
 		const results = [];
 		
-		if (seedreamResult.success) {
-			console.log("[Render] Seedream success, persisting...");
+		if (stableDiffusionResult.success) {
+			console.log("[Render] Stable Diffusion success, persisting...");
 			try {
 				const persisted = await persistRender({ 
 					projectId, 
 					conceptId, 
-					model: "v1-seedream", 
-					data: (seedreamResult as any).result.imageBuffer 
+					model: "v2-stable-diffusion-xl", 
+					data: (stableDiffusionResult as any).result.imageBuffer 
 				});
 				results.push(persisted);
 			} catch (error) {
-				console.error("[Render] Failed to persist Seedream result:", error);
+				console.error("[Render] Failed to persist Stable Diffusion result:", error);
 			}
 		} else {
-			console.error("[Render] Seedream failed:", (seedreamResult as any).error);
+			console.error("[Render] Stable Diffusion failed:", (stableDiffusionResult as any).error);
 		}
 
-		if (openaiResult.success) {
-			console.log("[Render] OpenAI success, persisting...");
+		if (dalleResult.success) {
+			console.log("[Render] DALL-E 2 success, persisting...");
 			try {
 				const persisted = await persistRender({ 
 					projectId, 
 					conceptId, 
-					model: "v1_5-openai", 
-					data: (openaiResult as any).result.imageBuffer 
+					model: "v2-dalle-2", 
+					data: (dalleResult as any).result.imageBuffer 
 				});
 				results.push(persisted);
 			} catch (error) {
-				console.error("[Render] Failed to persist OpenAI result:", error);
+				console.error("[Render] Failed to persist DALL-E 2 result:", error);
 			}
 		} else {
-			console.error("[Render] OpenAI failed:", (openaiResult as any).error);
+			console.error("[Render] DALL-E 2 failed:", (dalleResult as any).error);
 		}
 
 		// Return results (even if only one succeeded)
 		if (results.length === 0) {
 			return new Response(
 				JSON.stringify({ 
-					error: "Both models failed", 
+					error: "Both inpainting models failed", 
 					details: { 
-						seedream: seedreamResult.success ? "success" : (seedreamResult as any).error,
-						openai: openaiResult.success ? "success" : (openaiResult as any).error
+						stable_diffusion: stableDiffusionResult.success ? "success" : (stableDiffusionResult as any).error,
+						dalle: dalleResult.success ? "success" : (dalleResult as any).error
 					}
 				}), 
 				{ status: 500 }
 			);
 		}
 
-		console.log(`[Render] Completed with ${results.length}/2 successful renders`);
+		console.log(`[Render] Completed with ${results.length}/2 successful logo placements`);
 		return new Response(
 			JSON.stringify({ results }),
 			{ status: 200, headers: { "content-type": "application/json" } }
@@ -133,5 +135,5 @@ async function persistRender(params: { projectId: string; conceptId: string; mod
 	const basePath = `${new Date().toISOString().slice(0, 10)}/${params.projectId}/${params.conceptId}/${params.model}`;
 	const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
 	const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
-	return { model: params.model as "v1-seedream" | "v1_5-openai", imageUrl, thumbnailUrl };
+	return { model: params.model as "v2-stable-diffusion-xl" | "v2-dalle-2", imageUrl, thumbnailUrl };
 } 
