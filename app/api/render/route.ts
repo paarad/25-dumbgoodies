@@ -36,8 +36,27 @@ export async function POST(req: NextRequest) {
 			baseBuffer = base.imageBuffer;
 		}
 
+		// Convert to PNG and ensure proper format for OpenAI
+		console.log("[Render] Converting base image to PNG format...");
+		const pngBaseBuffer = await toPng(baseBuffer);
+		const baseImageSize = pngBaseBuffer.length;
+		console.log(`[Render] Base image size: ${Math.round(baseImageSize / 1024)} KB`);
+
+		// Check size limit (OpenAI requires < 4MB)
+		const maxSize = 4 * 1024 * 1024; // 4MB
+		if (baseImageSize > maxSize) {
+			console.log("[Render] Image too large, compressing...");
+			// Create a smaller version if needed
+			const compressed = await createThumbnail(pngBaseBuffer, 1024);
+			baseBuffer = compressed;
+			console.log(`[Render] Compressed image size: ${Math.round(compressed.length / 1024)} KB`);
+		} else {
+			baseBuffer = pngBaseBuffer;
+		}
+
 		// Build mask (simple centered patch for now)
 		const maskBuffer = buildCenteredLabelMask(1024, 1024);
+		console.log(`[Render] Mask size: ${Math.round(maskBuffer.length / 1024)} KB`);
 
 		// Focus on DALL-E 2 inpainting only for now
 		console.log("[Render] Starting logo placement with DALL-E 2...");
