@@ -14,6 +14,8 @@ function getReplicate(): Replicate {
 export async function seedreamGenerateBase(prompt: string): Promise<GeneratedImage> {
 	const replicate = getReplicate();
 	
+	console.log("[Seedream] Generating with prompt:", prompt);
+	
 	// Generate base product image using Seedream
 	const output = await replicate.run(REPLICATE_MODEL as any, {
 		input: {
@@ -25,11 +27,31 @@ export async function seedreamGenerateBase(prompt: string): Promise<GeneratedIma
 		},
 	});
 
-	// Replicate returns array of URLs, get the first one
-	const imageUrl = Array.isArray(output) ? output[0] : output;
-	if (typeof imageUrl !== "string") {
-		throw new Error("Unexpected Seedream output format");
+	console.log("[Seedream] Raw output:", output);
+	console.log("[Seedream] Output type:", typeof output);
+	console.log("[Seedream] Is array:", Array.isArray(output));
+
+	// Handle different possible output formats from Replicate
+	let imageUrl: string;
+	if (Array.isArray(output)) {
+		imageUrl = output[0];
+	} else if (typeof output === "string") {
+		imageUrl = output;
+	} else if (output && typeof output === "object" && "url" in output) {
+		imageUrl = (output as any).url;
+	} else if (output && typeof output === "object" && "image" in output) {
+		imageUrl = (output as any).image;
+	} else {
+		console.error("[Seedream] Unexpected output format:", JSON.stringify(output, null, 2));
+		throw new Error(`Unexpected Seedream output format: ${typeof output} - ${JSON.stringify(output)}`);
 	}
+
+	if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+		console.error("[Seedream] Invalid image URL:", imageUrl);
+		throw new Error(`Invalid image URL from Seedream: ${imageUrl}`);
+	}
+
+	console.log("[Seedream] Using image URL:", imageUrl);
 
 	// Fetch the image and convert to buffer
 	const response = await fetch(imageUrl);
@@ -55,6 +77,8 @@ export async function seedreamEditWithMask(params: {
 	
 	const editPrompt = `Add "${params.brand}" branding to this product. ${params.promptBase}`;
 	
+	console.log("[Seedream] Editing with prompt:", editPrompt);
+	
 	// Use Seedream for inpainting/editing
 	const output = await replicate.run(REPLICATE_MODEL as any, {
 		input: {
@@ -67,10 +91,25 @@ export async function seedreamEditWithMask(params: {
 		},
 	});
 
+	console.log("[Seedream] Edit output:", output);
+
 	// Handle output same as generation
-	const imageUrl = Array.isArray(output) ? output[0] : output;
-	if (typeof imageUrl !== "string") {
-		throw new Error("Unexpected Seedream edit output format");
+	let imageUrl: string;
+	if (Array.isArray(output)) {
+		imageUrl = output[0];
+	} else if (typeof output === "string") {
+		imageUrl = output;
+	} else if (output && typeof output === "object" && "url" in output) {
+		imageUrl = (output as any).url;
+	} else if (output && typeof output === "object" && "image" in output) {
+		imageUrl = (output as any).image;
+	} else {
+		console.error("[Seedream] Unexpected edit output format:", JSON.stringify(output, null, 2));
+		throw new Error(`Unexpected Seedream edit output format: ${typeof output} - ${JSON.stringify(output)}`);
+	}
+
+	if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+		throw new Error(`Invalid image URL from Seedream edit: ${imageUrl}`);
 	}
 
 	const response = await fetch(imageUrl);
