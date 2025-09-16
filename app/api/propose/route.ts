@@ -22,10 +22,37 @@ export async function POST(req: NextRequest) {
 		}
 		const { brand, product_hint, product_ref_url } = parsed.data;
 
+		// Always create a project first
+		const projectId = globalThis.crypto.randomUUID();
+		await getSupabaseAdmin().from("dumbgoodies_projects").insert({ id: projectId, brand });
+
+		// If product hint or product reference is provided, create a single concept for it
 		if (product_hint || product_ref_url) {
-			return new Response(JSON.stringify({ concepts: [] }), { status: 200 });
+			const conceptLabel = product_hint || "Custom Product";
+			const promptBase = product_hint || "custom product";
+			
+			const conceptId = globalThis.crypto.randomUUID();
+			await getSupabaseAdmin().from("dumbgoodies_concepts").insert({
+				id: conceptId,
+				project_id: projectId,
+				label: conceptLabel,
+				prompt_base: promptBase,
+				status: "idea"
+			});
+
+			return new Response(
+				JSON.stringify({ 
+					concepts: [{ 
+						id: conceptId, 
+						label: conceptLabel, 
+						prompt_base: promptBase 
+					}] 
+				}),
+				{ status: 200, headers: { "content-type": "application/json", "x-project-id": projectId } }
+			);
 		}
 
+		// Otherwise, propose 2 ideas using AI
 		const sys = proposeIdeas(brand);
 		const chat = await getOpenAI().chat.completions.create({
 			model: "gpt-4o-mini",
@@ -48,9 +75,6 @@ export async function POST(req: NextRequest) {
 		if (!Array.isArray(ideas) || ideas.length !== 2) {
 			return new Response(JSON.stringify({ error: "Bad ideas response" }), { status: 500 });
 		}
-
-		const projectId = globalThis.crypto.randomUUID();
-		await getSupabaseAdmin().from("dumbgoodies_projects").insert({ id: projectId, brand });
 
 		const concepts = ideas.map((i) => ({ id: globalThis.crypto.randomUUID(), label: i.label, prompt_base: i.prompt_base }));
 		await getSupabaseAdmin().from("dumbgoodies_concepts").insert(
