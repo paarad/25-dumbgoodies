@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 		const dallePromise = editImageWithMask({ 
 			image: baseBuffer, 
 			mask: maskBuffer, 
-			instruction: `Place "${brand}" logo or branding on this product with professional integration. Clean, realistic placement that matches the product's perspective and lighting.` 
+			instruction: `Add the "${brand}" text logo directly on the surface of the main object. The logo should appear as if it's printed, embossed, or branded onto the object's surface, following the object's perspective and curvature. Make it look realistic and integrated, not floating above the object.` 
 		}).then(result => ({ success: true, result }))
 		.catch(error => {
 			console.error("[Render] DALL-E 2 inpainting failed:", error);

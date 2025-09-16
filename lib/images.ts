@@ -49,9 +49,9 @@ export async function compositeLogoOnProduct(params: {
 	const productWidth = productMeta.width || 1024;
 	const productHeight = productMeta.height || 1024;
 	
-	// Calculate logo placement (centered horizontally, lower third vertically)
-	const logoMaxWidth = Math.floor(productWidth * 0.4); // Logo max 40% of product width
-	const logoMaxHeight = Math.floor(productHeight * 0.15); // Logo max 15% of product height
+	// Calculate logo size - smaller and more proportional
+	const logoMaxWidth = Math.floor(productWidth * 0.25); // Logo max 25% of product width (reduced from 40%)
+	const logoMaxHeight = Math.floor(productHeight * 0.1); // Logo max 10% of product height (reduced from 15%)
 	
 	// Resize logo to fit within constraints while maintaining aspect ratio
 	const resizedLogo = await sharp(params.logoImage)
@@ -68,19 +68,50 @@ export async function compositeLogoOnProduct(params: {
 	const logoWidth = logoMeta.width || 0;
 	const logoHeight = logoMeta.height || 0;
 	
-	// Calculate position (centered horizontally, positioned at 62% down vertically)
-	const logoX = Math.floor((productWidth - logoWidth) / 2);
-	const logoY = Math.floor(productHeight * 0.62);
+	// Try multiple positioning strategies to find the best placement
+	const positions = [
+		// Center of image (most likely object location)
+		{ 
+			x: Math.floor((productWidth - logoWidth) / 2), 
+			y: Math.floor((productHeight - logoHeight) / 2),
+			name: "center"
+		},
+		// Lower center (common for products)
+		{ 
+			x: Math.floor((productWidth - logoWidth) / 2), 
+			y: Math.floor(productHeight * 0.7 - logoHeight / 2),
+			name: "lower-center"
+		},
+		// Upper center
+		{ 
+			x: Math.floor((productWidth - logoWidth) / 2), 
+			y: Math.floor(productHeight * 0.3 - logoHeight / 2),
+			name: "upper-center"
+		},
+		// Right side center
+		{ 
+			x: Math.floor(productWidth * 0.7 - logoWidth / 2), 
+			y: Math.floor((productHeight - logoHeight) / 2),
+			name: "right-center"
+		}
+	];
 	
-	console.log(`[Images] Logo placement: ${logoWidth}x${logoHeight} at (${logoX}, ${logoY})`);
+	// For now, use the center position as it's most likely to be on the object
+	// In the future, we could use computer vision to detect the object boundaries
+	const bestPosition = positions[0]; // center position
 	
-	// Composite logo onto product image
+	console.log(`[Images] Logo placement: ${logoWidth}x${logoHeight} at (${bestPosition.x}, ${bestPosition.y}) [${bestPosition.name}]`);
+	
+	// Composite logo onto product image with semi-transparent blending for better integration
 	const composited = await sharp(params.productImage)
 		.composite([{
-			input: resizedLogo,
-			left: logoX,
-			top: logoY,
-			blend: 'over' // Proper alpha blending
+			input: await sharp(resizedLogo)
+				.modulate({ brightness: 0.9 }) // Slightly darken to look more integrated
+				.png()
+				.toBuffer(),
+			left: bestPosition.x,
+			top: bestPosition.y,
+			blend: 'multiply' // Use multiply blend mode for more realistic integration
 		}])
 		.png()
 		.toBuffer();
