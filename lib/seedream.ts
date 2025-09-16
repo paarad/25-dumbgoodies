@@ -11,6 +11,68 @@ function getReplicate(): Replicate {
 	return new Replicate({ auth: REPLICATE_API_TOKEN });
 }
 
+// Helper to handle Replicate output (ReadableStream or URL)
+async function extractImageFromOutput(output: any): Promise<string> {
+	console.log("[Seedream] Processing output:", output);
+	console.log("[Seedream] Output type:", typeof output);
+	console.log("[Seedream] Is array:", Array.isArray(output));
+
+	// Handle array output (get first item)
+	if (Array.isArray(output)) {
+		output = output[0];
+	}
+
+	// Handle ReadableStream
+	if (output && typeof output === "object" && output.constructor && output.constructor.name === "ReadableStream") {
+		console.log("[Seedream] Handling ReadableStream");
+		const reader = output.getReader();
+		const chunks: Uint8Array[] = [];
+		
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				chunks.push(value);
+			}
+		} finally {
+			reader.releaseLock();
+		}
+		
+		// Combine chunks and convert to text (should be URL)
+		const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+		const combined = new Uint8Array(totalLength);
+		let offset = 0;
+		for (const chunk of chunks) {
+			combined.set(chunk, offset);
+			offset += chunk.length;
+		}
+		
+		const text = new TextDecoder().decode(combined).trim();
+		console.log("[Seedream] Stream decoded to:", text);
+		return text;
+	}
+
+	// Handle direct string URL
+	if (typeof output === "string") {
+		console.log("[Seedream] Direct string URL:", output);
+		return output;
+	}
+
+	// Handle object with url/image property
+	if (output && typeof output === "object") {
+		if ("url" in output) {
+			console.log("[Seedream] Object with url:", output.url);
+			return output.url;
+		}
+		if ("image" in output) {
+			console.log("[Seedream] Object with image:", output.image);
+			return output.image;
+		}
+	}
+
+	throw new Error(`Unsupported Replicate output format: ${typeof output} - ${JSON.stringify(output)}`);
+}
+
 export async function seedreamGenerateBase(prompt: string): Promise<GeneratedImage> {
 	const replicate = getReplicate();
 	
@@ -27,27 +89,9 @@ export async function seedreamGenerateBase(prompt: string): Promise<GeneratedIma
 		},
 	});
 
-	console.log("[Seedream] Raw output:", output);
-	console.log("[Seedream] Output type:", typeof output);
-	console.log("[Seedream] Is array:", Array.isArray(output));
+	const imageUrl = await extractImageFromOutput(output);
 
-	// Handle different possible output formats from Replicate
-	let imageUrl: string;
-	if (Array.isArray(output)) {
-		imageUrl = output[0];
-	} else if (typeof output === "string") {
-		imageUrl = output;
-	} else if (output && typeof output === "object" && "url" in output) {
-		imageUrl = (output as any).url;
-	} else if (output && typeof output === "object" && "image" in output) {
-		imageUrl = (output as any).image;
-	} else {
-		console.error("[Seedream] Unexpected output format:", JSON.stringify(output, null, 2));
-		throw new Error(`Unexpected Seedream output format: ${typeof output} - ${JSON.stringify(output)}`);
-	}
-
-	if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
-		console.error("[Seedream] Invalid image URL:", imageUrl);
+	if (!imageUrl || !imageUrl.startsWith("http")) {
 		throw new Error(`Invalid image URL from Seedream: ${imageUrl}`);
 	}
 
@@ -91,24 +135,9 @@ export async function seedreamEditWithMask(params: {
 		},
 	});
 
-	console.log("[Seedream] Edit output:", output);
+	const imageUrl = await extractImageFromOutput(output);
 
-	// Handle output same as generation
-	let imageUrl: string;
-	if (Array.isArray(output)) {
-		imageUrl = output[0];
-	} else if (typeof output === "string") {
-		imageUrl = output;
-	} else if (output && typeof output === "object" && "url" in output) {
-		imageUrl = (output as any).url;
-	} else if (output && typeof output === "object" && "image" in output) {
-		imageUrl = (output as any).image;
-	} else {
-		console.error("[Seedream] Unexpected edit output format:", JSON.stringify(output, null, 2));
-		throw new Error(`Unexpected Seedream edit output format: ${typeof output} - ${JSON.stringify(output)}`);
-	}
-
-	if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+	if (!imageUrl || !imageUrl.startsWith("http")) {
 		throw new Error(`Invalid image URL from Seedream edit: ${imageUrl}`);
 	}
 
