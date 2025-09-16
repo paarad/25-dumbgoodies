@@ -60,13 +60,41 @@ async function extractImageFromOutput(output: any): Promise<string> {
 
 	// Handle object with url/image property
 	if (output && typeof output === "object") {
-		if ("url" in output) {
-			console.log("[Seedream] Object with url:", output.url);
+		// Check if url property exists and is a string
+		if ("url" in output && typeof output.url === "string") {
+			console.log("[Seedream] Object with url string:", output.url);
 			return output.url;
 		}
-		if ("image" in output) {
-			console.log("[Seedream] Object with image:", output.image);
+		// Check if url property exists but is a function (call it)
+		if ("url" in output && typeof output.url === "function") {
+			console.log("[Seedream] Object with url function, calling it...");
+			try {
+				const result = output.url();
+				console.log("[Seedream] url() returned:", result);
+				if (typeof result === "string") {
+					return result;
+				}
+			} catch (error) {
+				console.error("[Seedream] Error calling url():", error);
+			}
+		}
+		// Check if image property exists and is a string
+		if ("image" in output && typeof output.image === "string") {
+			console.log("[Seedream] Object with image string:", output.image);
 			return output.image;
+		}
+		// Check if image property exists but is a function (call it)
+		if ("image" in output && typeof output.image === "function") {
+			console.log("[Seedream] Object with image function, calling it...");
+			try {
+				const result = output.image();
+				console.log("[Seedream] image() returned:", result);
+				if (typeof result === "string") {
+					return result;
+				}
+			} catch (error) {
+				console.error("[Seedream] Error calling image():", error);
+			}
 		}
 	}
 
@@ -91,8 +119,8 @@ export async function seedreamGenerateBase(prompt: string): Promise<GeneratedIma
 
 	const imageUrl = await extractImageFromOutput(output);
 
-	if (!imageUrl || !imageUrl.startsWith("http")) {
-		throw new Error(`Invalid image URL from Seedream: ${imageUrl}`);
+	if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+		throw new Error(`Invalid image URL from Seedream: ${typeof imageUrl} - ${imageUrl}`);
 	}
 
 	console.log("[Seedream] Using image URL:", imageUrl);
@@ -137,8 +165,8 @@ export async function seedreamEditWithMask(params: {
 
 	const imageUrl = await extractImageFromOutput(output);
 
-	if (!imageUrl || !imageUrl.startsWith("http")) {
-		throw new Error(`Invalid image URL from Seedream edit: ${imageUrl}`);
+	if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+		throw new Error(`Invalid image URL from Seedream edit: ${typeof imageUrl} - ${imageUrl}`);
 	}
 
 	const response = await fetch(imageUrl);
