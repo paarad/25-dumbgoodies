@@ -19,7 +19,7 @@ export async function generateBaseImage(prompt: string): Promise<GeneratedImage>
 	
 	const resp = await getOpenAI().images.generate({
 		model: "dall-e-3",
-		prompt: `Product photography: ${prompt}. Clean studio background, professional lighting, centered composition, high quality, commercial product shot`,
+		prompt: `${prompt} in its natural environment, realistic scene, high quality, centered composition`,
 		size: "1024x1024",
 		quality: "standard",
 		response_format: "b64_json",
