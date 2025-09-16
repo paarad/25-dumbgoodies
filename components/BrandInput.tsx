@@ -65,7 +65,7 @@ export function BrandInput({ onSubmit }: Props) {
 				</label>
 			</div>
 			
-			<div className="text-xs opacity-70">
+			<div className="text-xs text-gray-500">
 				Leave product fields empty to auto-generate 2 dumb ideas • Upload files for guided rendering
 			</div>
 		</form>

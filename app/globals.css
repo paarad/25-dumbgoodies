@@ -5,32 +5,25 @@
   --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Custom input and button styles to match the example */
+/* Light theme only - clean neutral styles */
 .input-neutral {
-  @apply rounded-md border border-black/20 dark:border-white/25 p-2.5 text-sm bg-transparent;
+  @apply rounded-md border border-gray-200 p-2.5 text-sm bg-white;
 }
 
 .button-primary {
-  @apply inline-flex items-center rounded-md bg-black text-white dark:bg-white dark:text-black px-4 py-2 text-sm disabled:opacity-60;
+  @apply inline-flex items-center rounded-md bg-black text-white px-4 py-2 text-sm disabled:opacity-60 hover:bg-gray-800;
 }
 
 .button-secondary {
-  @apply inline-flex items-center rounded-md border border-black/20 dark:border-white/25 px-3.5 py-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/10;
+  @apply inline-flex items-center rounded-md border border-gray-200 px-3.5 py-2 text-sm cursor-pointer hover:bg-gray-50 bg-white;
 }
 
 .card-neutral {
-  @apply rounded-xl border border-black/20 dark:border-white/25 p-5 sm:p-6 bg-white dark:bg-black/20;
+  @apply rounded-xl border border-gray-200 p-5 sm:p-6 bg-white shadow-sm;
 }

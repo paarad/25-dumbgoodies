@@ -34,10 +34,10 @@ export function RenderCard({ projectId, conceptId, model, imageUrl, thumbnailUrl
 	}
 
 	return (
-		<div className="rounded-lg border border-black/10 dark:border-white/10 p-3 flex flex-col gap-3 bg-white dark:bg-black/20">
-			<div className="text-xs opacity-70 font-medium">{model === "v1-seedream" ? "v1 Seedream" : "v1.5 OpenAI"}</div>
+		<div className="rounded-lg border border-gray-200 p-3 flex flex-col gap-3 bg-white shadow-sm">
+			<div className="text-xs text-gray-600 font-medium">{model === "v1-seedream" ? "v1 Seedream" : "v1.5 OpenAI"}</div>
 			<a href={imageUrl} target="_blank" rel="noreferrer" className="block">
-				<img src={thumbnailUrl ?? imageUrl} alt={model} className="w-full h-auto rounded-md bg-gray-50 dark:bg-gray-800" />
+				<img src={thumbnailUrl ?? imageUrl} alt={model} className="w-full h-auto rounded-md bg-gray-50" />
 			</a>
 			<div className="flex items-center gap-2">
 				<a

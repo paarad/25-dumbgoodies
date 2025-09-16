@@ -89,8 +89,8 @@ export default function HomePage() {
 	return (
 		<div className="font-sans min-h-screen p-6 sm:p-10 max-w-5xl mx-auto flex flex-col gap-8">
 			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
-				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight">DumbGoodies</h1>
-				<p className="mt-3 text-sm sm:text-base opacity-80">Generate dumb merch images from your logo or brand name with AI competition mode.</p>
+				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900">DumbGoodies</h1>
+				<p className="mt-3 text-sm sm:text-base text-gray-600">Generate dumb merch images from your logo or brand name with AI competition mode.</p>
 			</section>
 
 			<section className="card-neutral">
@@ -99,7 +99,7 @@ export default function HomePage() {
 
 			{loading && (
 				<section className="text-center">
-					<div className="text-sm opacity-70">Rendering your dumb goodies...</div>
+					<div className="text-sm text-gray-600">Rendering your dumb goodies...</div>
 				</section>
 			)}
 
@@ -120,12 +120,12 @@ export default function HomePage() {
 			{!loading && concepts.length === 0 && (
 				<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
 					<div className="card-neutral">
-						<h3 className="font-medium">AI Competition</h3>
-						<p className="text-sm opacity-80 mt-1">Compare Seedream 4.0 vs OpenAI gpt-image-1 side-by-side for each concept.</p>
+						<h3 className="font-medium text-gray-900">AI Competition</h3>
+						<p className="text-sm text-gray-600 mt-1">Compare Seedream 4.0 vs OpenAI gpt-image-1 side-by-side for each concept.</p>
 					</div>
 					<div className="card-neutral">
-						<h3 className="font-medium">Smart Placement</h3>
-						<p className="text-sm opacity-80 mt-1">Logos are intelligently placed with proper perspective and realistic materials.</p>
+						<h3 className="font-medium text-gray-900">Smart Placement</h3>
+						<p className="text-sm text-gray-600 mt-1">Logos are intelligently placed with proper perspective and realistic materials.</p>
 					</div>
 				</section>
 			)}
