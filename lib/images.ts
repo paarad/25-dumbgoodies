@@ -49,9 +49,9 @@ export async function compositeLogoOnProduct(params: {
 	const productWidth = productMeta.width || 1024;
 	const productHeight = productMeta.height || 1024;
 	
-	// Calculate logo size - smaller and more proportional
-	const logoMaxWidth = Math.floor(productWidth * 0.25); // Logo max 25% of product width (reduced from 40%)
-	const logoMaxHeight = Math.floor(productHeight * 0.1); // Logo max 10% of product height (reduced from 15%)
+	// Calculate logo size - much smaller for more realistic placement
+	const logoMaxWidth = Math.floor(productWidth * 0.15); // Reduced to 15% 
+	const logoMaxHeight = Math.floor(productHeight * 0.08); // Reduced to 8%
 	
 	// Resize logo to fit within constraints while maintaining aspect ratio
 	const resizedLogo = await sharp(params.logoImage)
@@ -68,53 +68,58 @@ export async function compositeLogoOnProduct(params: {
 	const logoWidth = logoMeta.width || 0;
 	const logoHeight = logoMeta.height || 0;
 	
-	// Try multiple positioning strategies to find the best placement
+	// Multiple positioning strategies for better placement
 	const positions = [
+		// Lower center (common for product labels)
+		{ 
+			x: Math.floor((productWidth - logoWidth) / 2), 
+			y: Math.floor(productHeight * 0.75 - logoHeight / 2),
+			name: "lower-center"
+		},
+		// Right side center (good for bottles, cans)
+		{ 
+			x: Math.floor(productWidth * 0.7 - logoWidth / 2), 
+			y: Math.floor((productHeight - logoHeight) / 2),
+			name: "right-center"
+		},
 		// Center of image (most likely object location)
 		{ 
 			x: Math.floor((productWidth - logoWidth) / 2), 
 			y: Math.floor((productHeight - logoHeight) / 2),
 			name: "center"
 		},
-		// Lower center (common for products)
-		{ 
-			x: Math.floor((productWidth - logoWidth) / 2), 
-			y: Math.floor(productHeight * 0.7 - logoHeight / 2),
-			name: "lower-center"
-		},
 		// Upper center
 		{ 
 			x: Math.floor((productWidth - logoWidth) / 2), 
-			y: Math.floor(productHeight * 0.3 - logoHeight / 2),
+			y: Math.floor(productHeight * 0.25 - logoHeight / 2),
 			name: "upper-center"
 		},
-		// Right side center
-		{ 
-			x: Math.floor(productWidth * 0.7 - logoWidth / 2), 
-			y: Math.floor((productHeight - logoHeight) / 2),
-			name: "right-center"
-		}
 	];
-	
-	// For now, use the center position as it's most likely to be on the object
-	// In the future, we could use computer vision to detect the object boundaries
-	const bestPosition = positions[0]; // center position
-	
+
+	// Use the lower-center position as it's most common for product labels
+	const bestPosition = positions[0]; // lower-center position
+
 	console.log(`[Images] Logo placement: ${logoWidth}x${logoHeight} at (${bestPosition.x}, ${bestPosition.y}) [${bestPosition.name}]`);
-	
-	// Composite logo onto product image with semi-transparent blending for better integration
+
+	// Create a subtle shadow/outline effect for better integration
+	const logoWithShadow = await sharp(resizedLogo)
+		.modulate({ 
+			brightness: 0.85, // Slightly darker to look more integrated
+			saturation: 0.9   // Slightly desaturated
+		})
+		.png()
+		.toBuffer();
+
+	// Composite logo onto product image with better blending
 	const composited = await sharp(params.productImage)
 		.composite([{
-			input: await sharp(resizedLogo)
-				.modulate({ brightness: 0.9 }) // Slightly darken to look more integrated
-				.png()
-				.toBuffer(),
+			input: logoWithShadow,
 			left: bestPosition.x,
 			top: bestPosition.y,
-			blend: 'multiply' // Use multiply blend mode for more realistic integration
+			blend: 'overlay' // Use overlay for more realistic integration (was 'multiply')
 		}])
 		.png()
 		.toBuffer();
-	
+
 	return composited;
 } 

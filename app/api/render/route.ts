@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 		// Create results array for different approaches
 		const results = [];
 
-		// Approach 1: Direct logo compositing (if logo is provided)
+		// Only use direct logo compositing if logo is provided
 		if (logoUrl) {
 			console.log("[Render] Using direct logo compositing...");
 			try {
@@ -78,59 +78,35 @@ export async function POST(req: NextRequest) {
 			} catch (error) {
 				console.error("[Render] Logo composite failed:", error);
 			}
-		}
-
-		// Approach 2: DALL-E 2 text-based editing (as fallback or alternative)
-		console.log("[Render] Generating mask...");
-		const maskBuffer = await buildCenteredLabelMask(1024, 1024);
-		console.log(`[Render] Mask size: ${Math.round(maskBuffer.length / 1024)} KB`);
-
-		console.log("[Render] Starting DALL-E 2 text-based logo placement...");
-		
-		const dallePromise = editImageWithMask({ 
-			image: baseBuffer, 
-			mask: maskBuffer, 
-			instruction: `Add the "${brand}" text logo directly on the surface of the main object. The logo should appear as if it's printed, embossed, or branded onto the object's surface, following the object's perspective and curvature. Make it look realistic and integrated, not floating above the object.` 
-		}).then(result => ({ success: true, result }))
-		.catch(error => {
-			console.error("[Render] DALL-E 2 inpainting failed:", error);
-			return { success: false, error: error.message };
-		});
-
-		const [dalleResult] = await Promise.all([dallePromise]);
-
-		if (dalleResult.success) {
-			console.log("[Render] DALL-E 2 success, persisting...");
+		} else {
+			// If no logo provided, still create one version with just the base image
+			console.log("[Render] No logo provided, saving base image...");
 			try {
 				const persisted = await persistRender({ 
 					projectId, 
 					conceptId, 
-					model: "v2-dalle-2", 
-					data: (dalleResult as any).result.imageBuffer 
+					model: "v2-dalle-3-base", 
+					data: baseBuffer 
 				});
 				results.push(persisted);
+				console.log("[Render] Base image persisted");
 			} catch (error) {
-				console.error("[Render] Failed to persist DALL-E 2 result:", error);
+				console.error("[Render] Failed to persist base image:", error);
 			}
-		} else {
-			console.error("[Render] DALL-E 2 failed:", (dalleResult as any).error);
 		}
 
 		// Return results
 		if (results.length === 0) {
 			return new Response(
-				JSON.stringify({ 
-					error: "All logo placement methods failed", 
-					details: { 
-						dalle: dalleResult.success ? "success" : (dalleResult as any).error,
-						composite: logoUrl ? "attempted" : "skipped (no logo provided)"
-					}
-				}), 
+				JSON.stringify({
+					error: "Logo compositing failed",
+					details: logoUrl ? "Logo compositing failed" : "No logo provided and base image persistence failed"
+				}),
 				{ status: 500 }
 			);
 		}
 
-		console.log(`[Render] Completed with ${results.length} successful logo placement(s)`);
+		console.log(`[Render] Completed with ${results.length} successful render(s)`);
 		return new Response(
 			JSON.stringify({ results }),
 			{ status: 200, headers: { "content-type": "application/json" } }

@@ -36,6 +36,8 @@ export function RenderCard({ projectId, conceptId, model, imageUrl, thumbnailUrl
 		switch (model) {
 			case "v2-logo-composite":
 				return "Logo Composite";
+			case "v2-dalle-3-base":
+				return "DALL-E 3 Base";
 			case "v2-stable-diffusion-xl":
 				return "SDXL Inpainting";
 			case "v2-dalle-2":

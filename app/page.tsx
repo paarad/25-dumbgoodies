@@ -18,41 +18,48 @@ export default function HomePage() {
 		productHint?: string | null;
 		productRefFile?: File | null;
 	}) {
-		setLoading(true);
 		try {
+			setLoading(true);
+
 			let logoUrl: string | undefined;
 			let productRefUrl: string | undefined;
+
+			// Upload logo if provided
 			if (params.logoFile) {
-				logoUrl = await uploadFile(params.logoFile);
-			}
-			if (params.productRefFile) {
-				productRefUrl = await uploadFile(params.productRefFile);
+				const fd = new FormData();
+				fd.append("file", params.logoFile);
+				const res = await fetch("/api/upload", { method: "POST", body: fd });
+				const data = await res.json();
+				if (!res.ok) throw new Error((data as { error?: string }).error || "Logo upload failed");
+				logoUrl = (data as { url: string }).url;
 			}
 
-			// Propose exactly two concepts if no product guidance
-			let conceptsLocal: Array<{ id: string; label: string; prompt_base: string }> = [];
-			let createdProjectId: string;
-			if (!params.productHint && !productRefUrl) {
-				const res = await fetch("/api/propose", {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ brand: params.brand, logoUrl }),
-				});
+			// Upload product reference if provided
+			if (params.productRefFile) {
+				const fd = new FormData();
+				fd.append("file", params.productRefFile);
+				const res = await fetch("/api/upload", { method: "POST", body: fd });
 				const data = await res.json();
-				if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
-				conceptsLocal = (data as { concepts: { id: string; label: string; prompt_base: string }[] }).concepts;
-				createdProjectId = res.headers.get("x-project-id") || crypto.randomUUID();
-			} else {
-				// Create a project and a single concept for the guided product
-				createdProjectId = crypto.randomUUID();
-				conceptsLocal = [
-					{
-						id: crypto.randomUUID(),
-						label: params.productHint ? `User Product: ${params.productHint}` : "User Product",
-						prompt_base: params.productHint || "clean studio product shot, 1:1",
-					},
-				];
+				if (!res.ok) throw new Error((data as { error?: string }).error || "Product image upload failed");
+				productRefUrl = (data as { url: string }).url;
 			}
+
+			// Always call propose API to create project and concepts in database
+			const res = await fetch("/api/propose", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ 
+					brand: params.brand, 
+					logoUrl,
+					product_hint: params.productHint,
+					product_ref_url: productRefUrl
+				}),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
+			
+			const conceptsLocal = (data as { concepts: { id: string; label: string; prompt_base: string }[] }).concepts;
+			const createdProjectId = res.headers.get("x-project-id") || crypto.randomUUID();
 
 			setProjectId(createdProjectId);
 			setConcepts(conceptsLocal);
@@ -131,13 +138,4 @@ export default function HomePage() {
 			)}
 		</div>
 	);
-}
-
-async function uploadFile(file: File): Promise<string> {
-	const fd = new FormData();
-	fd.append("file", file);
-	const res = await fetch("/api/upload", { method: "POST", body: fd });
-	const data = await res.json();
-	if (!res.ok) throw new Error((data as { error?: string }).error || "Upload failed");
-	return (data as { url: string }).url;
 }
