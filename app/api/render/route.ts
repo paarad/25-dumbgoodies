@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Build mask (simple centered patch for now)
-		const maskBuffer = buildCenteredLabelMask(1024, 1024);
+		console.log("[Render] Generating mask...");
+		const maskBuffer = await buildCenteredLabelMask(1024, 1024);
 		console.log(`[Render] Mask size: ${Math.round(maskBuffer.length / 1024)} KB`);
 
 		// Focus on DALL-E 2 inpainting only for now
