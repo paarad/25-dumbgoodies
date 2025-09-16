@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 // import { seedreamEditWithMask } from "@/lib/seedream";
 import { generateBaseImage, editImageWithMask } from "@/lib/openai";
-import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng } from "@/lib/images";
+import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng, compositeLogoOnProduct } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 		if (!parsed.success) {
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
-		const { projectId, conceptId, brand, productRefUrl, promptBase } = parsed.data;
+		const { projectId, conceptId, brand, logoUrl, productRefUrl, promptBase } = parsed.data;
 
 		// Build or fetch base image - using DALL-E 3 as primary
 		let baseBuffer: Buffer;
@@ -36,17 +36,16 @@ export async function POST(req: NextRequest) {
 			baseBuffer = base.imageBuffer;
 		}
 
-		// Convert to PNG and ensure proper format for OpenAI
+		// Convert to PNG and ensure proper format
 		console.log("[Render] Converting base image to PNG format...");
 		const pngBaseBuffer = await toPng(baseBuffer);
 		const baseImageSize = pngBaseBuffer.length;
 		console.log(`[Render] Base image size: ${Math.round(baseImageSize / 1024)} KB`);
 
-		// Check size limit (OpenAI requires < 4MB)
+		// Check size limit and compress if needed
 		const maxSize = 4 * 1024 * 1024; // 4MB
 		if (baseImageSize > maxSize) {
 			console.log("[Render] Image too large, compressing...");
-			// Create a smaller version if needed
 			const compressed = await createThumbnail(pngBaseBuffer, 1024);
 			baseBuffer = compressed;
 			console.log(`[Render] Compressed image size: ${Math.round(compressed.length / 1024)} KB`);
@@ -54,15 +53,40 @@ export async function POST(req: NextRequest) {
 			baseBuffer = pngBaseBuffer;
 		}
 
-		// Build mask (simple centered patch for now)
+		// Create results array for different approaches
+		const results = [];
+
+		// Approach 1: Direct logo compositing (if logo is provided)
+		if (logoUrl) {
+			console.log("[Render] Using direct logo compositing...");
+			try {
+				const logoBuffer = await bufferFromUrl(logoUrl);
+				const compositedImage = await compositeLogoOnProduct({
+					productImage: baseBuffer,
+					logoImage: logoBuffer,
+					brand
+				});
+
+				const persisted = await persistRender({ 
+					projectId, 
+					conceptId, 
+					model: "v2-logo-composite", 
+					data: compositedImage 
+				});
+				results.push(persisted);
+				console.log("[Render] Logo composite success, persisted");
+			} catch (error) {
+				console.error("[Render] Logo composite failed:", error);
+			}
+		}
+
+		// Approach 2: DALL-E 2 text-based editing (as fallback or alternative)
 		console.log("[Render] Generating mask...");
 		const maskBuffer = await buildCenteredLabelMask(1024, 1024);
 		console.log(`[Render] Mask size: ${Math.round(maskBuffer.length / 1024)} KB`);
 
-		// Focus on DALL-E 2 inpainting only for now
-		console.log("[Render] Starting logo placement with DALL-E 2...");
+		console.log("[Render] Starting DALL-E 2 text-based logo placement...");
 		
-		// Model: DALL-E 2 Inpainting (reliable and works)
 		const dallePromise = editImageWithMask({ 
 			image: baseBuffer, 
 			mask: maskBuffer, 
@@ -73,40 +97,7 @@ export async function POST(req: NextRequest) {
 			return { success: false, error: error.message };
 		});
 
-		// TODO: Re-enable Stable Diffusion once DALL-E is working
-		// const stableDiffusionPromise = seedreamEditWithMask({ 
-		// 	image: baseBuffer, 
-		// 	mask: maskBuffer, 
-		// 	brand, 
-		// 	promptBase 
-		// }).then(result => ({ success: true, result }))
-		// .catch(error => {
-		// 	console.error("[Render] Stable Diffusion inpainting failed:", error);
-		// 	return { success: false, error: error.message };
-		// });
-
 		const [dalleResult] = await Promise.all([dallePromise]);
-
-		// Process successful results
-		const results = [];
-		
-		// TODO: Re-enable when we add Stable Diffusion back
-		// if (stableDiffusionResult.success) {
-		// 	console.log("[Render] Stable Diffusion success, persisting...");
-		// 	try {
-		// 		const persisted = await persistRender({ 
-		// 			projectId, 
-		// 			conceptId, 
-		// 			model: "v2-stable-diffusion-xl", 
-		// 			data: (stableDiffusionResult as any).result.imageBuffer 
-		// 		});
-		// 		results.push(persisted);
-		// 	} catch (error) {
-		// 		console.error("[Render] Failed to persist Stable Diffusion result:", error);
-		// 	}
-		// } else {
-		// 	console.error("[Render] Stable Diffusion failed:", (stableDiffusionResult as any).error);
-		// }
 
 		if (dalleResult.success) {
 			console.log("[Render] DALL-E 2 success, persisting...");
@@ -129,9 +120,10 @@ export async function POST(req: NextRequest) {
 		if (results.length === 0) {
 			return new Response(
 				JSON.stringify({ 
-					error: "DALL-E inpainting failed", 
+					error: "All logo placement methods failed", 
 					details: { 
-						dalle: dalleResult.success ? "success" : (dalleResult as any).error
+						dalle: dalleResult.success ? "success" : (dalleResult as any).error,
+						composite: logoUrl ? "attempted" : "skipped (no logo provided)"
 					}
 				}), 
 				{ status: 500 }
@@ -155,5 +147,5 @@ async function persistRender(params: { projectId: string; conceptId: string; mod
 	const basePath = `${new Date().toISOString().slice(0, 10)}/${params.projectId}/${params.conceptId}/${params.model}`;
 	const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
 	const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
-	return { model: params.model as "v2-dalle-2", imageUrl, thumbnailUrl };
+	return { model: params.model as "v2-logo-composite" | "v2-dalle-2", imageUrl, thumbnailUrl };
 } 

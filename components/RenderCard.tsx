@@ -34,6 +34,8 @@ export function RenderCard({ projectId, conceptId, model, imageUrl, thumbnailUrl
 
 	function getModelLabel(model: string): string {
 		switch (model) {
+			case "v2-logo-composite":
+				return "Logo Composite";
 			case "v2-stable-diffusion-xl":
 				return "SDXL Inpainting";
 			case "v2-dalle-2":
