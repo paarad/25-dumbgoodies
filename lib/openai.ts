@@ -14,12 +14,19 @@ export type GeneratedImage = {
 	mimeType: string; // e.g., "image/png"
 };
 
-export async function generateBaseImage(prompt: string): Promise<GeneratedImage> {
-	console.log("[OpenAI] Generating base image with DALL-E 3:", prompt);
+export async function generateBaseImage(prompt: string, brand?: string): Promise<GeneratedImage> {
+	let enhancedPrompt = `${prompt} in its natural environment, realistic scene, high quality, centered composition`;
+	
+	// If brand is provided, include it directly in the generation prompt for more natural integration
+	if (brand) {
+		enhancedPrompt = `${prompt} with "${brand}" logo or branding clearly visible and naturally integrated on the product surface, in its natural environment, realistic scene, high quality, centered composition`;
+	}
+	
+	console.log("[OpenAI] Generating base image with DALL-E 3:", enhancedPrompt);
 	
 	const resp = await getOpenAI().images.generate({
 		model: "dall-e-3",
-		prompt: `${prompt} in its natural environment, realistic scene, high quality, centered composition`,
+		prompt: enhancedPrompt,
 		size: "1024x1024",
 		quality: "standard",
 		response_format: "b64_json",

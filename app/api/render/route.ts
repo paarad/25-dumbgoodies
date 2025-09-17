@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
 			baseBuffer = await bufferFromUrl(productRefUrl);
 		} else {
 			console.log("[Render] Generating base image with DALL-E 3...");
-			const base = await generateBaseImage(promptBase);
+			// Generate with brand included in prompt for natural logo integration
+			const base = await generateBaseImage(promptBase, brand);
 			baseBuffer = base.imageBuffer;
 		}
 
@@ -56,13 +57,32 @@ export async function POST(req: NextRequest) {
 		// Create results array for different approaches
 		const results = [];
 
-		// Only use direct logo compositing if logo is provided
-		if (logoUrl) {
-			console.log("[Render] Using direct logo compositing...");
+		// Approach 1: Direct generation with brand in prompt (primary)
+		if (!productRefUrl) {
+			console.log("[Render] Using direct brand generation in DALL-E 3...");
 			try {
+				const persisted = await persistRender({ 
+					projectId, 
+					conceptId, 
+					model: "v2-dalle-3-direct", 
+					data: baseBuffer 
+				});
+				results.push(persisted);
+				console.log("[Render] Direct brand generation success, persisted");
+			} catch (error) {
+				console.error("[Render] Direct brand generation failed:", error);
+			}
+		}
+
+		// Approach 2: Logo compositing (if logo URL provided and we want a second version)
+		if (logoUrl) {
+			console.log("[Render] Creating additional logo composite version...");
+			try {
+				// Generate a clean base image without brand for compositing
+				const cleanBase = await generateBaseImage(promptBase);
 				const logoBuffer = await bufferFromUrl(logoUrl);
 				const compositedImage = await compositeLogoOnProduct({
-					productImage: baseBuffer,
+					productImage: cleanBase.imageBuffer,
 					logoImage: logoBuffer,
 					brand
 				});
@@ -77,21 +97,6 @@ export async function POST(req: NextRequest) {
 				console.log("[Render] Logo composite success, persisted");
 			} catch (error) {
 				console.error("[Render] Logo composite failed:", error);
-			}
-		} else {
-			// If no logo provided, still create one version with just the base image
-			console.log("[Render] No logo provided, saving base image...");
-			try {
-				const persisted = await persistRender({ 
-					projectId, 
-					conceptId, 
-					model: "v2-dalle-3-base", 
-					data: baseBuffer 
-				});
-				results.push(persisted);
-				console.log("[Render] Base image persisted");
-			} catch (error) {
-				console.error("[Render] Failed to persist base image:", error);
 			}
 		}
 
