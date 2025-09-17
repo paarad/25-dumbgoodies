@@ -91,7 +91,7 @@ export function BrandInput({ onSubmit }: Props) {
 				<input
 					value={productHint}
 					onChange={(e) => setProductHint(e.target.value)}
-					placeholder="Optional: product name (e.g., mug, t-shirt)"
+					placeholder="Specific product (e.g., 'inflatable pool floatie', 'ceramic coffee mug', 'cotton t-shirt')"
 					className="flex-1 input-neutral"
 				/>
 				<input 
@@ -103,7 +103,7 @@ export function BrandInput({ onSubmit }: Props) {
 					onChange={handleProductChange}
 				/>
 				<label htmlFor="product-input" className="button-secondary">
-					{productFile ? "✓ Photo" : "Product Photo"}
+					{productFile ? "✓ Product" : "Upload Product"}
 				</label>
 			</div>
 			

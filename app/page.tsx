@@ -97,7 +97,11 @@ export default function HomePage() {
 		<div className="font-sans min-h-screen p-6 sm:p-10 max-w-5xl mx-auto flex flex-col gap-8">
 			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
 				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900">DumbGoodies</h1>
-				<p className="mt-3 text-sm sm:text-base text-gray-600">Generate dumb merch images from your logo or brand name with AI competition mode.</p>
+				<p className="mt-3 text-sm sm:text-base text-gray-600">
+					Generate dumb merch images from your logo or brand name with AI. 
+					<br className="hidden sm:block" />
+					Specify a product to generate the same item multiple times!
+				</p>
 			</section>
 
 			<section className="card-neutral">

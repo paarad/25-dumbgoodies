@@ -54,58 +54,30 @@ export async function POST(req: NextRequest) {
 			baseBuffer = pngBaseBuffer;
 		}
 
-		// Create results array for different approaches
+		// Create results array
 		const results = [];
 
-		// Approach 1: Direct generation with brand in prompt (primary)
-		if (!productRefUrl) {
-			console.log("[Render] Using direct brand generation in DALL-E 3...");
-			try {
-				const persisted = await persistRender({ 
-					projectId, 
-					conceptId, 
-					model: "v2-dalle-3-direct", 
-					data: baseBuffer 
-				});
-				results.push(persisted);
-				console.log("[Render] Direct brand generation success, persisted");
-			} catch (error) {
-				console.error("[Render] Direct brand generation failed:", error);
-			}
-		}
-
-		// Approach 2: Logo compositing (if logo URL provided and we want a second version)
-		if (logoUrl) {
-			console.log("[Render] Creating additional logo composite version...");
-			try {
-				// Generate a clean base image without brand for compositing
-				const cleanBase = await generateBaseImage(promptBase);
-				const logoBuffer = await bufferFromUrl(logoUrl);
-				const compositedImage = await compositeLogoOnProduct({
-					productImage: cleanBase.imageBuffer,
-					logoImage: logoBuffer,
-					brand
-				});
-
-				const persisted = await persistRender({ 
-					projectId, 
-					conceptId, 
-					model: "v2-logo-composite", 
-					data: compositedImage 
-				});
-				results.push(persisted);
-				console.log("[Render] Logo composite success, persisted");
-			} catch (error) {
-				console.error("[Render] Logo composite failed:", error);
-			}
+		// DALL-E 3 Direct approach (primary and only approach now)
+		console.log("[Render] Using DALL-E 3 Direct generation...");
+		try {
+			const persisted = await persistRender({ 
+				projectId, 
+				conceptId, 
+				model: "v2-dalle-3-direct", 
+				data: baseBuffer 
+			});
+			results.push(persisted);
+			console.log("[Render] DALL-E 3 Direct success, persisted");
+		} catch (error) {
+			console.error("[Render] DALL-E 3 Direct failed:", error);
 		}
 
 		// Return results
 		if (results.length === 0) {
 			return new Response(
 				JSON.stringify({
-					error: "Logo compositing failed",
-					details: logoUrl ? "Logo compositing failed" : "No logo provided and base image persistence failed"
+					error: "DALL-E 3 Direct generation failed",
+					details: "Failed to generate image with integrated branding"
 				}),
 				{ status: 500 }
 			);
