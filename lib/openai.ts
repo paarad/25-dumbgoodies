@@ -1,73 +1,100 @@
+// lib/openai.ts
 import OpenAI from "openai";
+import sharp from "sharp";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-export function getOpenAI(): OpenAI {
-	if (!OPENAI_API_KEY) {
-		throw new Error("Missing OPENAI_API_KEY");
-	}
-	return new OpenAI({ apiKey: OPENAI_API_KEY });
+async function hasAlphaChannel(imageBuffer: Buffer): Promise<boolean> {
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    return metadata.hasAlpha === true;
+  } catch {
+    return false;
+  }
 }
 
-export type GeneratedImage = {
-	imageBuffer: Buffer;
-	mimeType: string; // e.g., "image/png"
-};
-
-export async function generateBaseImage(prompt: string, brand?: string): Promise<GeneratedImage> {
-	let enhancedPrompt = `${prompt} in its natural environment, realistic scene, high quality, centered composition`;
-	
-	// If brand is provided, include it directly in the generation prompt for more natural integration
-	if (brand) {
-		enhancedPrompt = `${prompt} with "${brand}" logo or text branding naturally applied to the product surface, following the product's curvature and perspective while maintaining logo readability and proportions, realistic integration, in its natural environment, realistic scene, high quality, centered composition`;
-	}
-	
-	console.log("[OpenAI] Generating base image with DALL-E 3:", enhancedPrompt);
-	
-	const resp = await getOpenAI().images.generate({
-		model: "dall-e-3",
-		prompt: enhancedPrompt,
-		size: "1024x1024",
-		quality: "standard",
-		response_format: "b64_json",
-	});
-	
-	const first = resp.data?.[0];
-	const b64 = first?.b64_json;
-	if (!b64) throw new Error("OpenAI generation returned empty response");
-	return { imageBuffer: Buffer.from(b64, "base64"), mimeType: "image/png" };
+function validateBrand(brand: string): string {
+  // Strip newlines/emojis, limit length, reject URLs
+  const cleaned = brand
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/[^\w\s\-\.]/g, '')
+    .trim()
+    .slice(0, 24);
+  
+  if (cleaned.length === 0) throw new Error("Invalid brand name");
+  if (/^https?:\/\//.test(cleaned)) throw new Error("Brand cannot be a URL");
+  
+  return cleaned;
 }
 
-export async function editImageWithMask(params: {
-	image: Buffer;
-	mask: Buffer;
-	instruction: string;
-	prompt?: string;
-}): Promise<GeneratedImage> {
-	console.log("[OpenAI] Editing image with instruction:", params.instruction);
-	
-	const form = new FormData();
-	form.append("model", "dall-e-2"); // Note: DALL-E 2 for editing, DALL-E 3 doesn't support editing yet
-	form.append("prompt", params.prompt ?? params.instruction);
-	form.append("image", new Blob([new Uint8Array(params.image)], { type: "image/png" }), "image.png");
-	form.append("mask", new Blob([new Uint8Array(params.mask)], { type: "image/png" }), "mask.png");
-	form.append("size", "1024x1024");
-	form.append("response_format", "b64_json");
+export async function generatePNG({
+  prompt,
+  size = "1024x1024",
+  brand,
+}: {
+  prompt: string;
+  size?: "1024x1024" | "1536x1024" | "1024x1536";
+  brand?: string;
+}) {
+  let enhancedPrompt = prompt;
+  
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await openai.images.generate({
+      model: "gpt-image-1",        // Current Images API model
+      prompt: enhancedPrompt,
+      size,
+      output_format: "png",        // PNG for alpha channel support
+      // NO response_format here - images.generate already returns b64_json
+      // optional if SDK supports it:
+      // background: "transparent",
+    });
+    
+    const b64 = res.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI generation returned empty response");
+    
+    // Quick sanity check for transparency on first attempt
+    if (attempt === 0) {
+      const buffer = Buffer.from(b64, "base64");
+      const hasAlpha = await hasAlphaChannel(buffer);
+      
+      if (!hasAlpha) {
+        console.log("[OpenAI] First attempt lacks transparency, retrying with stricter prompt...");
+        enhancedPrompt = prompt + "\nTransparent background only. No floor, no platform, no shadow, product cutout.";
+        if (brand) {
+          enhancedPrompt += `\nNo additional text or labels besides "${brand}".`;
+        }
+        continue;
+      }
+    }
+    
+    return b64;
+  }
+  
+  throw new Error("Failed to generate image with transparency after 2 attempts");
+}
 
-	const res = await fetch("https://api.openai.com/v1/images/edits", {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${OPENAI_API_KEY}`,
-		},
-		body: form,
-	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(`OpenAI edit failed: ${res.status} ${text}`);
-	}
-	type EditJson = { data?: Array<{ b64_json?: string }> };
-	const json = (await res.json()) as EditJson;
-	const b64 = json?.data?.[0]?.b64_json;
-	if (!b64) throw new Error("OpenAI edit returned no image");
-	return { imageBuffer: Buffer.from(b64, "base64"), mimeType: "image/png" };
+// Legacy compatibility - will be replaced
+export async function generateBaseImage(prompt: string, brand?: string): Promise<{ imageBuffer: Buffer; mimeType: string }> {
+  // Clean the prompt by removing environment/background descriptions
+  const cleanPrompt = prompt
+    .replace(/,?\s*[^,]*\s*(background|setting|environment|vibes)[^,]*/gi, '')
+    .replace(/,?\s*(on a|with a|in a|at a|beach|home|gym|office)[^,]*/gi, '')
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => part && !/(background|setting|environment|vibes|beach|home|gym|office)/i.test(part))
+    .join(', ')
+    .trim();
+
+  let enhancedPrompt: string;
+
+  if (brand) {
+    enhancedPrompt = `Single, isolated ${cleanPrompt}. Photorealistic studio packshot, centered. Apply the "${brand}" logo once, following surface curvature and perspective; preserve aspect ratio and legibility; realistic material/lighting. Transparent background (alpha). No environment, no platform, no ground plane, no reflections, no duplicate objects, no hands/people, no extra text, no patterns, no watermarks. Product only.`;
+  } else {
+    enhancedPrompt = `Single, isolated ${cleanPrompt}. Photorealistic studio packshot, centered. Transparent background (alpha). No environment, no platform, no ground plane, no reflections, no duplicate objects, no hands/people, no extra text, no patterns, no watermarks. Product only.`;
+  }
+
+  console.log("[OpenAI] Generating base image with gpt-image-1:", enhancedPrompt);
+
+  const b64 = await generatePNG({ prompt: enhancedPrompt });
+  return { imageBuffer: Buffer.from(b64, "base64"), mimeType: "image/png" };
 } 

@@ -1,104 +1,114 @@
-import { NextRequest } from "next/server";
-import { z } from "zod";
-// import { seedreamEditWithMask } from "@/lib/seedream";
-import { generateBaseImage, editImageWithMask } from "@/lib/openai";
-import { buildCenteredLabelMask, bufferFromUrl, createThumbnail, toPng, compositeLogoOnProduct } from "@/lib/images";
+// app/api/render/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { generatePNG } from "@/lib/openai";
+import { buildProductPrompt } from "@/lib/prompts";
+import { getTwoDumbIdeas } from "@/lib/ideas";
+import { createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-const BodySchema = z.object({
-	projectId: z.string().uuid(),
-	conceptId: z.string().uuid(),
-	brand: z.string().min(1),
-	logoUrl: z.string().url().optional(),
-	productRefUrl: z.string().url().optional(),
-	promptBase: z.string().min(1),
-});
+// Simple rate limiting (in-memory, per IP)
+const rateLimits = new Map<string, { count: number; resetTime: number }>();
 
-export async function POST(req: NextRequest) {
-	try {
-		const body = await req.json();
-		const parsed = BodySchema.safeParse(body);
-		if (!parsed.success) {
-			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
-		}
-		const { projectId, conceptId, brand, logoUrl, productRefUrl, promptBase } = parsed.data;
-
-		// Build or fetch base image - using DALL-E 3 as primary
-		let baseBuffer: Buffer;
-		if (productRefUrl) {
-			console.log("[Render] Using product reference image:", productRefUrl);
-			baseBuffer = await bufferFromUrl(productRefUrl);
-		} else {
-			console.log("[Render] Generating base image with DALL-E 3...");
-			// Generate with brand included in prompt for natural logo integration
-			const base = await generateBaseImage(promptBase, brand);
-			baseBuffer = base.imageBuffer;
-		}
-
-		// Convert to PNG and ensure proper format
-		console.log("[Render] Converting base image to PNG format...");
-		const pngBaseBuffer = await toPng(baseBuffer);
-		const baseImageSize = pngBaseBuffer.length;
-		console.log(`[Render] Base image size: ${Math.round(baseImageSize / 1024)} KB`);
-
-		// Check size limit and compress if needed
-		const maxSize = 4 * 1024 * 1024; // 4MB
-		if (baseImageSize > maxSize) {
-			console.log("[Render] Image too large, compressing...");
-			const compressed = await createThumbnail(pngBaseBuffer, 1024);
-			baseBuffer = compressed;
-			console.log(`[Render] Compressed image size: ${Math.round(compressed.length / 1024)} KB`);
-		} else {
-			baseBuffer = pngBaseBuffer;
-		}
-
-		// Create results array
-		const results = [];
-
-		// DALL-E 3 Direct approach (primary and only approach now)
-		console.log("[Render] Using DALL-E 3 Direct generation...");
-		try {
-			const persisted = await persistRender({ 
-				projectId, 
-				conceptId, 
-				model: "v2-dalle-3-direct", 
-				data: baseBuffer 
-			});
-			results.push(persisted);
-			console.log("[Render] DALL-E 3 Direct success, persisted");
-		} catch (error) {
-			console.error("[Render] DALL-E 3 Direct failed:", error);
-		}
-
-		// Return results
-		if (results.length === 0) {
-			return new Response(
-				JSON.stringify({
-					error: "DALL-E 3 Direct generation failed",
-					details: "Failed to generate image with integrated branding"
-				}),
-				{ status: 500 }
-			);
-		}
-
-		console.log(`[Render] Completed with ${results.length} successful render(s)`);
-		return new Response(
-			JSON.stringify({ results }),
-			{ status: 200, headers: { "content-type": "application/json" } }
-		);
-	} catch (err) {
-		console.error("/api/render error", err);
-		return new Response(JSON.stringify({ error: "Render failed" }), { status: 500 });
-	}
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const limit = rateLimits.get(ip);
+  
+  if (!limit || now > limit.resetTime) {
+    rateLimits.set(ip, { count: 1, resetTime: now + 60000 }); // 1 minute window
+    return true;
+  }
+  
+  if (limit.count >= 10) { // 10 renders per minute
+    return false;
+  }
+  
+  limit.count++;
+  return true;
 }
 
-async function persistRender(params: { projectId: string; conceptId: string; model: string; data: Buffer; }) {
-	const png = await toPng(params.data);
-	const thumb = await createThumbnail(png, 512);
-	const basePath = `${new Date().toISOString().slice(0, 10)}/${params.projectId}/${params.conceptId}/${params.model}`;
-	const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
-	const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
-	return { model: params.model as "v2-logo-composite" | "v2-dalle-2", imageUrl, thumbnailUrl };
+function validateBrand(brand: string): string {
+  // Strip newlines/emojis, limit length, reject URLs
+  const cleaned = brand
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/[^\w\s\-\.]/g, '')
+    .trim()
+    .slice(0, 24);
+  
+  if (cleaned.length === 0) throw new Error("Invalid brand name");
+  if (/^https?:\/\//.test(cleaned)) throw new Error("Brand cannot be a URL");
+  
+  return cleaned;
+}
+
+export async function POST(req: NextRequest) {
+  const { brand, product, variants = 2 } = await req.json();
+
+  if (!brand || typeof brand !== "string") {
+    return NextResponse.json({ error: "brand_required" }, { status: 400 });
+  }
+
+  // Rate limiting
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "rate_limit_exceeded" }, { status: 429 });
+  }
+
+  // Validate and clean brand name
+  let cleanBrand: string;
+  try {
+    cleanBrand = validateBrand(brand);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 400 });
+  }
+
+      try {
+      // Case A: product provided -> N variants of that product
+      if (product && typeof product === "string") {
+        const prompts = Array.from({ length: Math.max(1, Math.min(variants, 4)) })
+          .map(() => buildProductPrompt(cleanBrand, product));
+
+        const images = await Promise.all(prompts.map(p => generatePNG({ prompt: p, brand: cleanBrand })));
+      
+      // Convert to buffers and upload
+      const results = [];
+      for (let i = 0; i < images.length; i++) {
+        const buffer = Buffer.from(images[i], "base64");
+        const png = await toPng(buffer);
+        const thumb = await createThumbnail(png, 512);
+        const basePath = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${i}`;
+        const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
+        const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
+        results.push({ model: "dalle-3-direct", imageUrl, thumbnailUrl });
+      }
+      
+      return NextResponse.json({ items: [{ product, images: results }] });
+    }
+
+              // Case B: no product -> propose 2 dumb ideas, each with 1 image initially (2 images total)
+    const ideas = await getTwoDumbIdeas(cleanBrand); // returns 2 strings
+    const results = [];
+    for (const idea of ideas) {
+      const prompt = buildProductPrompt(cleanBrand, idea);
+      const imageB64 = await generatePNG({ prompt, brand: cleanBrand });
+      
+      // Convert to buffer and upload
+      const buffer = Buffer.from(imageB64, "base64");
+      const png = await toPng(buffer);
+      const thumb = await createThumbnail(png, 512);
+      const basePath = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${idea.replace(/\s+/g, '-')}-0`;
+      const imageUrl = await uploadBufferToStorage({ bucket: BUCKET_RENDERS, path: `${basePath}.png`, data: png, contentType: "image/png" });
+      const thumbnailUrl = await uploadBufferToStorage({ bucket: BUCKET_THUMBS, path: `${basePath}_512.png`, data: thumb, contentType: "image/png" });
+      
+      results.push({ 
+        product: idea, 
+        images: [{ model: "v1_5-openai", imageUrl, thumbnailUrl }]
+      });
+    }
+    return NextResponse.json({ items: results });
+  } catch (e: any) {
+    console.error(e);
+    return NextResponse.json({ error: e.message ?? "render_error" }, { status: 500 });
+  }
 } 

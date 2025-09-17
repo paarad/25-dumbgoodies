@@ -2,19 +2,22 @@
 
 import { useState } from "react";
 import { BrandInput } from "@/components/BrandInput";
-import { IdeaCard } from "@/components/IdeaCard";
+import { ProductCard } from "@/components/ProductCard";
 
-type RenderResult = {
-	model: string;
-	imageUrl: string;
-	thumbnailUrl?: string;
+type ProductItem = {
+	product: string;
+	images: Array<{
+		model: string;
+		imageUrl: string;
+		thumbnailUrl?: string;
+	}>;
 };
 
 export default function Home() {
 	const [loading, setLoading] = useState(false);
-	const [projectId, setProjectId] = useState<string | null>(null);
-	const [concepts, setConcepts] = useState<Array<{ id: string; label: string; prompt_base: string }>>([]);
-	const [resultsByConcept, setResultsByConcept] = useState<Record<string, RenderResult[]>>({});
+	const [brand, setBrand] = useState<string>("");
+	const [products, setProducts] = useState<ProductItem[]>([]);
+	const [generatingMore, setGeneratingMore] = useState(false);
 
 	async function handleStart(params: {
 		brand: string;
@@ -62,37 +65,19 @@ export default function Home() {
 			const data = await res.json();
 			if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
 			
-			const conceptsLocal = (data as { concepts: { id: string; label: string; prompt_base: string }[] }).concepts;
-			const createdProjectId = res.headers.get("x-project-id") || crypto.randomUUID();
+			setBrand(params.brand);
 
-			setProjectId(createdProjectId);
-			setConcepts(conceptsLocal);
-
-			// Render competition for each concept
-			const entries = await Promise.all(
-				conceptsLocal.map(async (c) => {
-					const renderBody: Record<string, any> = {
-						projectId: createdProjectId,
-						conceptId: c.id,
-						brand: params.brand,
-						promptBase: c.prompt_base,
-						logoUrl: logoUrl,
-					};
-					
-					// Only add optional fields if they have values
-					if (productRefUrl) renderBody.productRefUrl = productRefUrl;
-					
-					const res = await fetch("/api/render", {
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify(renderBody),
-					});
-					const json = (await res.json()) as { results?: RenderResult[]; error?: string };
-					if (!res.ok || !json.results) throw new Error(json.error || "Render failed");
-					return [c.id, json.results] as const;
-				})
-			);
-			setResultsByConcept(Object.fromEntries(entries));
+			// Use new simplified render API - just pass brand, it will auto-generate 2 ideas with 1 image each
+			const renderRes = await fetch("/api/render", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ brand: params.brand }),
+			});
+			const renderData = await renderRes.json();
+			if (!renderRes.ok || !renderData.items) throw new Error(renderData.error || "Render failed");
+			
+			// Set products directly from new API response
+			setProducts(renderData.items);
 		} catch (e) {
 			console.error(e);
 			alert("Something failed. Check console.");
@@ -122,23 +107,33 @@ export default function Home() {
 				</section>
 			)}
 
-			{concepts.length > 0 && !loading && (
+			{products.length > 0 && !loading && (
 				<section className="space-y-6">
 					<h2 className="text-xl font-semibold text-gray-900">Your Dumb Goodies</h2>
 					<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
-						{concepts.map((concept) => (
-							<IdeaCard
-								key={concept.id}
-								concept={concept}
-								results={resultsByConcept[concept.id] || []}
-								projectId={projectId!}
+						{products.map((product, index) => (
+							<ProductCard
+								key={`${product.product}-${index}`}
+								brand={brand}
+								product={product.product}
+								images={product.images}
+								onGenerateMore={() => setGeneratingMore(true)}
+								onImageAdded={(newImage) => {
+									setProducts(prev => prev.map((p, i) => 
+										i === index 
+											? { ...p, images: [...p.images, newImage] }
+											: p
+									));
+									setGeneratingMore(false);
+								}}
+								generatingMore={generatingMore}
 							/>
 						))}
 					</div>
 				</section>
 			)}
 
-			{!loading && concepts.length === 0 && (
+			{!loading && products.length === 0 && (
 				<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
 					<div className="card-neutral">
 						<h3 className="font-medium text-gray-900">AI-Powered Branding</h3>

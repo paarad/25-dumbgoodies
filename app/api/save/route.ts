@@ -5,8 +5,8 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 export const runtime = "edge";
 
 const BodySchema = z.object({
-	projectId: z.string().uuid(),
-	conceptId: z.string().uuid(),
+	brand: z.string().min(1),
+	product: z.string().min(1),
 	model: z.string(),
 	imageUrl: z.string().url(),
 	thumbnailUrl: z.string().url().optional(),
@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
 		if (!parsed.success) {
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
-		const { projectId, conceptId, model, imageUrl, thumbnailUrl } = parsed.data;
+		const { brand, product, model, imageUrl, thumbnailUrl } = parsed.data;
 		const id = globalThis.crypto.randomUUID();
 		const { error } = await getSupabaseAdmin().from("dumbgoodies_renders").insert({
 			id,
-			project_id: projectId,
-			concept_id: conceptId,
+			brand,
+			product,
 			model,
 			image_url: imageUrl,
 			thumbnail_url: thumbnailUrl,
