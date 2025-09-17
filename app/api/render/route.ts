@@ -11,14 +11,10 @@ const BodySchema = z.object({
 	projectId: z.string().uuid(),
 	conceptId: z.string().uuid(),
 	brand: z.string().min(1),
-	logoUrl: z.string().url().optional().or(z.literal("")),
-	productRefUrl: z.string().url().optional().or(z.literal("")),
+	logoUrl: z.string().url().optional(),
+	productRefUrl: z.string().url().optional(),
 	promptBase: z.string().min(1),
-}).transform((data) => ({
-	...data,
-	logoUrl: data.logoUrl === "" ? undefined : data.logoUrl,
-	productRefUrl: data.productRefUrl === "" ? undefined : data.productRefUrl,
-}));
+});
 
 export async function POST(req: NextRequest) {
 	try {

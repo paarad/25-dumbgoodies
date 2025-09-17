@@ -8,21 +8,19 @@ export const runtime = "edge";
 
 const BodySchema = z.object({
 	brand: z.string().min(1),
-	logoUrl: z.string().url().optional().or(z.literal("")),
-	product_hint: z.string().optional().or(z.literal("")),
-	product_ref_url: z.string().url().optional().or(z.literal("")),
-}).transform((data) => ({
-	...data,
-	logoUrl: data.logoUrl === "" ? undefined : data.logoUrl,
-	product_hint: data.product_hint === "" ? undefined : data.product_hint,
-	product_ref_url: data.product_ref_url === "" ? undefined : data.product_ref_url,
-}));
+	logoUrl: z.string().url().optional(),
+	product_hint: z.string().optional(),
+	product_ref_url: z.string().url().optional(),
+});
 
 export async function POST(req: NextRequest) {
 	try {
 		const body = await req.json();
+		console.log("[Propose] Received body:", JSON.stringify(body, null, 2));
+		
 		const parsed = BodySchema.safeParse(body);
 		if (!parsed.success) {
+			console.error("[Propose] Validation failed:", JSON.stringify(parsed.error, null, 2));
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
 		const { brand, product_hint, product_ref_url } = parsed.data;

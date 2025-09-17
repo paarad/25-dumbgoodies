@@ -45,15 +45,19 @@ export default function HomePage() {
 			}
 
 			// Always call propose API to create project and concepts in database
+			const requestBody: Record<string, any> = {
+				brand: params.brand,
+			};
+			
+			// Only add optional fields if they have values
+			if (logoUrl) requestBody.logoUrl = logoUrl;
+			if (params.productHint?.trim()) requestBody.product_hint = params.productHint.trim();
+			if (productRefUrl) requestBody.product_ref_url = productRefUrl;
+			
 			const res = await fetch("/api/propose", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ 
-					brand: params.brand, 
-					logoUrl,
-					product_hint: params.productHint,
-					product_ref_url: productRefUrl
-				}),
+				body: JSON.stringify(requestBody),
 			});
 			const data = await res.json();
 			if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
@@ -67,17 +71,21 @@ export default function HomePage() {
 			// Render competition for each concept
 			const entries = await Promise.all(
 				conceptsLocal.map(async (c) => {
+					const renderBody: Record<string, any> = {
+						projectId: createdProjectId,
+						conceptId: c.id,
+						brand: params.brand,
+						promptBase: c.prompt_base,
+					};
+					
+					// Only add optional fields if they have values
+					if (logoUrl) renderBody.logoUrl = logoUrl;
+					if (productRefUrl) renderBody.productRefUrl = productRefUrl;
+					
 					const res = await fetch("/api/render", {
 						method: "POST",
 						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							projectId: createdProjectId,
-							conceptId: c.id,
-							brand: params.brand,
-							logoUrl,
-							productRefUrl,
-							promptBase: c.prompt_base,
-						}),
+						body: JSON.stringify(renderBody),
 					});
 					const json = (await res.json()) as { results?: RenderResult[]; error?: string };
 					if (!res.ok || !json.results) throw new Error(json.error || "Render failed");
