@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getOpenAI } from "@/lib/openai";
-import { proposeIdeas } from "@/lib/prompts";
+import { getRandomDumbProducts } from "@/lib/dumb-products";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "edge";
@@ -59,34 +58,27 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		// Otherwise, propose 2 ideas using AI
-		const sys = proposeIdeas(brand);
-		const chat = await getOpenAI().chat.completions.create({
-			model: "gpt-4o-mini",
-			messages: [
-				{ role: "system", content: sys },
-				{ role: "user", content: "Return JSON only." },
-			],
-			response_format: { type: "json_object" },
-		});
-		const content = chat.choices[0]?.message?.content ?? "[]";
-		let ideas: Array<{ label: string; prompt_base: string }> = [];
-		try {
-			const parsedJson = JSON.parse(content) as unknown;
-			if (Array.isArray(parsedJson)) {
-				ideas = parsedJson as Array<{ label: string; prompt_base: string }>;
-			}
-		} catch {
-			ideas = [];
-		}
-		if (!Array.isArray(ideas) || ideas.length !== 2) {
-			return new Response(JSON.stringify({ error: "Bad ideas response" }), { status: 500 });
-		}
+		// Otherwise, use predefined random dumb products (reliable!)
+		console.log("[Propose] Generating 2 random dumb products from predefined list");
+		const randomProducts = getRandomDumbProducts(2);
+		
+		const concepts = randomProducts.map((product) => ({
+			id: globalThis.crypto.randomUUID(),
+			label: product.label,
+			prompt_base: product.prompt_base
+		}));
 
-		const concepts = ideas.map((i) => ({ id: globalThis.crypto.randomUUID(), label: i.label, prompt_base: i.prompt_base }));
 		await getSupabaseAdmin().from("dumbgoodies_concepts").insert(
-			concepts.map((c) => ({ id: c.id, project_id: projectId, label: c.label, prompt_base: c.prompt_base, status: "idea" }))
+			concepts.map((c) => ({ 
+				id: c.id, 
+				project_id: projectId, 
+				label: c.label, 
+				prompt_base: c.prompt_base, 
+				status: "idea" 
+			}))
 		);
+
+		console.log("[Propose] Successfully created project and concepts:", concepts.map(c => c.label));
 
 		return new Response(
 			JSON.stringify({ concepts }),
