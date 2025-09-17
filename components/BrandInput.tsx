@@ -47,7 +47,7 @@ export function BrandInput({ onSubmit }: Props) {
 			return;
 		}
 		if (!brand.trim()) {
-			alert("Please enter a brand name!");
+			alert("Please use a logo file with a meaningful filename!");
 			return;
 		}
 		setSubmitting(true);
@@ -74,30 +74,19 @@ export function BrandInput({ onSubmit }: Props) {
 						required
 					/>
 					<label htmlFor="logo-input" className="button-secondary flex-1 justify-center">
-						{logoFile ? "✓ Logo Uploaded" : "Upload Logo (Required)"}
+						{logoFile ? `✓ ${brand} Logo` : "Upload Logo (Required)"}
 					</label>
 				</div>
 				
 				{logoFile && (
 					<div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-						📎 Logo: {logoFile.name}
+						📎 {logoFile.name} → Brand: "{brand}"
 					</div>
 				)}
 			</div>
 
 			<div className="space-y-3">
-				<div className="text-sm font-medium text-gray-900">2. Brand Name</div>
-				<input
-					value={brand}
-					onChange={(e) => setBrand(e.target.value)}
-					placeholder="Brand name (auto-filled from logo filename)"
-					className="w-full input-neutral"
-					required
-				/>
-			</div>
-
-			<div className="space-y-3">
-				<div className="text-sm font-medium text-gray-900">3. Specific Product (Optional)</div>
+				<div className="text-sm font-medium text-gray-900">2. Specific Product (Optional)</div>
 				<div className="flex items-stretch gap-2">
 					<input
 						value={productHint}
@@ -126,11 +115,11 @@ export function BrandInput({ onSubmit }: Props) {
 			</div>
 
 			<div className="text-xs text-gray-500">
-				💡 Upload a logo to get started • Leave product fields empty for 2 auto-generated ideas
+				💡 Brand name auto-extracted from logo filename • Leave product empty for 2 auto-generated ideas
 			</div>
 
 			<button type="submit" disabled={submitting || !logoFile} className="button-primary">
-				{submitting ? "Generating..." : "Generate Dumb Goodies"}
+				{submitting ? "Generating..." : `Generate ${brand || "Dumb"} Goodies`}
 			</button>
 		</form>
 	);
