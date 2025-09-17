@@ -19,7 +19,7 @@ export async function generateBaseImage(prompt: string, brand?: string): Promise
 	
 	// If brand is provided, include it directly in the generation prompt for more natural integration
 	if (brand) {
-		enhancedPrompt = `${prompt} with "${brand}" logo or text branding placed on a flat surface area of the product where it won't be distorted or warped, maintaining the logo's original proportions and readability, in its natural environment, realistic scene, high quality, centered composition`;
+		enhancedPrompt = `${prompt} with "${brand}" logo or text branding naturally applied to the product surface, following the product's curvature and perspective while maintaining logo readability and proportions, realistic integration, in its natural environment, realistic scene, high quality, centered composition`;
 	}
 	
 	console.log("[OpenAI] Generating base image with DALL-E 3:", enhancedPrompt);
