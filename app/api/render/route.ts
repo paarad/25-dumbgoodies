@@ -5,6 +5,7 @@ import { buildProductPrompt } from "@/lib/prompts";
 import { getTwoDumbIdeas } from "@/lib/ideas";
 import { createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
+import { makeGuideAndMask, integrateLogo } from "@/lib/composite";
 
 export const runtime = "nodejs";
 
@@ -42,8 +43,28 @@ function validateBrand(brand: string): string {
   return cleaned;
 }
 
+async function generateWithLogo(brand: string, product: string, logoUrl: string) {
+  // Step 1: Generate clean product (no branding)
+  const cleanPrompt = buildProductPrompt(brand, product, undefined, true); // hasLogoFile = true
+  const baseImageB64 = await generatePNG({ prompt: cleanPrompt, brand });
+  const baseBuffer = Buffer.from(baseImageB64, "base64");
+  
+  // Step 2: Download logo
+  const logoResponse = await fetch(logoUrl);
+  if (!logoResponse.ok) throw new Error("Failed to download logo");
+  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+  
+  // Step 3: Create guide and mask
+  const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
+  
+  // Step 4: Integrate logo using DALL-E edit
+  const integratedB64 = await integrateLogo({ guide, mask, brand, product });
+  
+  return integratedB64;
+}
+
 export async function POST(req: NextRequest) {
-  const { brand, product, variants = 2 } = await req.json();
+  const { brand, product, variants = 2, logoUrl } = await req.json();
 
   if (!brand || typeof brand !== "string") {
     return NextResponse.json({ error: "brand_required" }, { status: 400 });
@@ -66,10 +87,19 @@ export async function POST(req: NextRequest) {
       try {
       // Case A: product provided -> N variants of that product
       if (product && typeof product === "string") {
-        const prompts = Array.from({ length: Math.max(1, Math.min(variants, 4)) })
-          .map(() => buildProductPrompt(cleanBrand, product));
-
-        const images = await Promise.all(prompts.map(p => generatePNG({ prompt: p, brand: cleanBrand })));
+        let images: string[];
+        
+        if (logoUrl && typeof logoUrl === "string") {
+          // Use logo integration pipeline
+          const imagePromises = Array.from({ length: Math.max(1, Math.min(variants, 4)) })
+            .map(() => generateWithLogo(cleanBrand, product, logoUrl));
+          images = await Promise.all(imagePromises);
+        } else {
+          // Use text-based branding (existing flow)
+          const prompts = Array.from({ length: Math.max(1, Math.min(variants, 4)) })
+            .map(() => buildProductPrompt(cleanBrand, product));
+          images = await Promise.all(prompts.map(p => generatePNG({ prompt: p, brand: cleanBrand })));
+        }
       
       // Convert to buffers and upload
       const results = [];
@@ -86,12 +116,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ items: [{ product, images: results }] });
     }
 
-              // Case B: no product -> propose 2 dumb ideas, each with 1 image initially (2 images total)
-    const ideas = await getTwoDumbIdeas(cleanBrand); // returns 2 strings
-    const results = [];
-    for (const idea of ideas) {
-      const prompt = buildProductPrompt(cleanBrand, idea);
-      const imageB64 = await generatePNG({ prompt, brand: cleanBrand });
+                    // Case B: no product -> propose 2 dumb ideas, each with 1 image initially (2 images total)
+      const ideas = await getTwoDumbIdeas(cleanBrand); // returns 2 strings
+      const results = [];
+      for (const idea of ideas) {
+        let imageB64: string;
+        
+        if (logoUrl && typeof logoUrl === "string") {
+          // Use logo integration pipeline
+          imageB64 = await generateWithLogo(cleanBrand, idea, logoUrl);
+        } else {
+          // Use text-based branding (existing flow)
+          const prompt = buildProductPrompt(cleanBrand, idea);
+          imageB64 = await generatePNG({ prompt, brand: cleanBrand });
+        }
       
       // Convert to buffer and upload
       const buffer = Buffer.from(imageB64, "base64");

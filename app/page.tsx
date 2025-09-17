@@ -16,6 +16,7 @@ type ProductItem = {
 export default function Home() {
 	const [loading, setLoading] = useState(false);
 	const [brand, setBrand] = useState<string>("");
+	const [logoUrl, setLogoUrl] = useState<string>("");
 	const [products, setProducts] = useState<ProductItem[]>([]);
 	const [generatingMore, setGeneratingMore] = useState(false);
 
@@ -65,14 +66,15 @@ export default function Home() {
 			const data = await res.json();
 			if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
 			
-			setBrand(params.brand);
+					setBrand(params.brand);
+		setLogoUrl(logoUrl);
 
-			// Use new simplified render API - just pass brand, it will auto-generate 2 ideas with 1 image each
-			const renderRes = await fetch("/api/render", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ brand: params.brand }),
-			});
+		// Use new simplified render API - pass brand and logoUrl for proper logo integration
+		const renderRes = await fetch("/api/render", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ brand: params.brand, logoUrl }),
+		});
 			const renderData = await renderRes.json();
 			if (!renderRes.ok || !renderData.items) throw new Error(renderData.error || "Render failed");
 			
@@ -111,24 +113,25 @@ export default function Home() {
 				<section className="space-y-6">
 					<h2 className="text-xl font-semibold text-gray-900">Your Dumb Goodies</h2>
 					<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
-						{products.map((product, index) => (
-							<ProductCard
-								key={`${product.product}-${index}`}
-								brand={brand}
-								product={product.product}
-								images={product.images}
-								onGenerateMore={() => setGeneratingMore(true)}
-								onImageAdded={(newImage) => {
-									setProducts(prev => prev.map((p, i) => 
-										i === index 
-											? { ...p, images: [...p.images, newImage] }
-											: p
-									));
-									setGeneratingMore(false);
-								}}
-								generatingMore={generatingMore}
-							/>
-						))}
+											{products.map((product, index) => (
+						<ProductCard
+							key={`${product.product}-${index}`}
+							brand={brand}
+							product={product.product}
+							logoUrl={logoUrl}
+							images={product.images}
+							onGenerateMore={() => setGeneratingMore(true)}
+							onImageAdded={(newImage) => {
+								setProducts(prev => prev.map((p, i) => 
+									i === index 
+										? { ...p, images: [...p.images, newImage] }
+										: p
+								));
+								setGeneratingMore(false);
+							}}
+							generatingMore={generatingMore}
+						/>
+					))}
 					</div>
 				</section>
 			)}

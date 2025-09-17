@@ -4,6 +4,7 @@ import { generatePNG } from "@/lib/openai";
 import { buildProductPrompt } from "@/lib/prompts";
 import { createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
+import { makeGuideAndMask, integrateLogo } from "@/lib/composite";
 
 export const runtime = "nodejs";
 
@@ -20,8 +21,28 @@ function validateBrand(brand: string): string {
   return cleaned;
 }
 
+async function generateWithLogo(brand: string, product: string, logoUrl: string) {
+  // Step 1: Generate clean product (no branding)
+  const cleanPrompt = buildProductPrompt(brand, product, undefined, true); // hasLogoFile = true
+  const baseImageB64 = await generatePNG({ prompt: cleanPrompt, brand });
+  const baseBuffer = Buffer.from(baseImageB64, "base64");
+  
+  // Step 2: Download logo
+  const logoResponse = await fetch(logoUrl);
+  if (!logoResponse.ok) throw new Error("Failed to download logo");
+  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+  
+  // Step 3: Create guide and mask
+  const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
+  
+  // Step 4: Integrate logo using DALL-E edit
+  const integratedB64 = await integrateLogo({ guide, mask, brand, product });
+  
+  return integratedB64;
+}
+
 export async function POST(req: NextRequest) {
-  const { brand, product } = await req.json();
+  const { brand, product, logoUrl } = await req.json();
 
   if (!brand || typeof brand !== "string") {
     return NextResponse.json({ error: "brand_required" }, { status: 400 });
@@ -41,8 +62,16 @@ export async function POST(req: NextRequest) {
 
   try {
     // Generate one more variant of the specified product
-    const prompt = buildProductPrompt(cleanBrand, product);
-    const imageB64 = await generatePNG({ prompt, brand: cleanBrand });
+    let imageB64: string;
+    
+    if (logoUrl && typeof logoUrl === "string") {
+      // Use logo integration pipeline
+      imageB64 = await generateWithLogo(cleanBrand, product, logoUrl);
+    } else {
+      // Use text-based branding (existing flow)
+      const prompt = buildProductPrompt(cleanBrand, product);
+      imageB64 = await generatePNG({ prompt, brand: cleanBrand });
+    }
     
     // Convert to buffer and upload
     const buffer = Buffer.from(imageB64, "base64");

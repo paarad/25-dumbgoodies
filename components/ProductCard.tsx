@@ -5,6 +5,7 @@ import { useState } from "react";
 type Props = {
   brand: string;
   product: string;
+  logoUrl?: string;
   images: Array<{
     model: string;
     imageUrl: string;
@@ -78,7 +79,7 @@ function ProductImageCard({
   );
 }
 
-export function ProductCard({ brand, product, images, onGenerateMore, onImageAdded, generatingMore }: Props) {
+export function ProductCard({ brand, product, logoUrl, images, onGenerateMore, onImageAdded, generatingMore }: Props) {
   const [localGenerating, setLocalGenerating] = useState(false);
 
   async function handleGenerateMore() {
@@ -90,7 +91,7 @@ export function ProductCard({ brand, product, images, onGenerateMore, onImageAdd
       const res = await fetch("/api/render-more", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ brand, product }),
+        body: JSON.stringify({ brand, product, logoUrl }),
       });
       const data = await res.json();
       if (res.ok && data.image) {

@@ -28,7 +28,15 @@ const APPLICATIONS = [
   'laser-etched logo',
 ];
 
-export function buildProductPrompt(brand: string, product: string, appHint?: string) {
+export function buildProductPrompt(brand: string, product: string, appHint?: string, hasLogoFile = false) {
+  if (hasLogoFile) {
+    // When logo file is provided: generate clean product with no branding
+    return `Single, isolated ${product}. Photorealistic studio packshot, centered.
+Plain surface with NO branding; leave a clean, empty area appropriate for a logo on the front/center.
+Transparent background (alpha). No environment, no platform/ground plane, no reflections, no duplicate objects, no people/hands, no extra text, no patterns, no watermarks. Product only.`;
+  }
+
+  // When no logo file: use brand text prompting (existing behavior)
   const application = appHint || APPLICATIONS[Math.floor(Math.random() * APPLICATIONS.length)];
   
   return `Single, isolated ${product}. Photorealistic studio packshot, centered.
