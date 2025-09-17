@@ -8,10 +8,15 @@ export const runtime = "edge";
 
 const BodySchema = z.object({
 	brand: z.string().min(1),
-	logoUrl: z.string().url().optional(),
-	product_hint: z.string().optional(),
-	product_ref_url: z.string().url().optional(),
-});
+	logoUrl: z.string().url().optional().or(z.literal("")),
+	product_hint: z.string().optional().or(z.literal("")),
+	product_ref_url: z.string().url().optional().or(z.literal("")),
+}).transform((data) => ({
+	...data,
+	logoUrl: data.logoUrl === "" ? undefined : data.logoUrl,
+	product_hint: data.product_hint === "" ? undefined : data.product_hint,
+	product_ref_url: data.product_ref_url === "" ? undefined : data.product_ref_url,
+}));
 
 export async function POST(req: NextRequest) {
 	try {
