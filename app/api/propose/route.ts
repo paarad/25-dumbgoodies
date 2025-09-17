@@ -8,7 +8,7 @@ export const runtime = "edge";
 
 const BodySchema = z.object({
 	brand: z.string().min(1),
-	logoUrl: z.string().url().optional(),
+	logoUrl: z.string().url(), // Now required
 	product_hint: z.string().optional(),
 	product_ref_url: z.string().url().optional(),
 });
@@ -23,11 +23,15 @@ export async function POST(req: NextRequest) {
 			console.error("[Propose] Validation failed:", JSON.stringify(parsed.error, null, 2));
 			return new Response(JSON.stringify({ error: parsed.error.message }), { status: 400 });
 		}
-		const { brand, product_hint, product_ref_url } = parsed.data;
+		const { brand, logoUrl, product_hint, product_ref_url } = parsed.data;
 
 		// Always create a project first
 		const projectId = globalThis.crypto.randomUUID();
-		await getSupabaseAdmin().from("dumbgoodies_projects").insert({ id: projectId, brand });
+		await getSupabaseAdmin().from("dumbgoodies_projects").insert({ 
+			id: projectId, 
+			brand,
+			logo_url: logoUrl // Store the logo URL
+		});
 
 		// If product hint or product reference is provided, create a single concept for it
 		if (product_hint || product_ref_url) {
@@ -92,4 +96,4 @@ export async function POST(req: NextRequest) {
 		console.error("/api/propose error", err);
 		return new Response(JSON.stringify({ error: "Propose failed" }), { status: 500 });
 	}
-} 
+}

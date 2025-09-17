@@ -4,53 +4,53 @@ import { useState } from "react";
 import { BrandInput } from "@/components/BrandInput";
 import { IdeaCard } from "@/components/IdeaCard";
 
-type RenderResult = { model: "v1-seedream" | "v1_5-openai"; imageUrl: string; thumbnailUrl: string };
+type RenderResult = {
+	model: string;
+	imageUrl: string;
+	thumbnailUrl?: string;
+};
 
-export default function HomePage() {
+export default function Home() {
+	const [loading, setLoading] = useState(false);
 	const [projectId, setProjectId] = useState<string | null>(null);
 	const [concepts, setConcepts] = useState<Array<{ id: string; label: string; prompt_base: string }>>([]);
 	const [resultsByConcept, setResultsByConcept] = useState<Record<string, RenderResult[]>>({});
-	const [loading, setLoading] = useState(false);
 
 	async function handleStart(params: {
 		brand: string;
-		logoFile?: File | null;
+		logoFile: File;
 		productHint?: string | null;
 		productRefFile?: File | null;
 	}) {
 		try {
 			setLoading(true);
 
-			let logoUrl: string | undefined;
-			let productRefUrl: string | undefined;
-
-			// Upload logo if provided
-			if (params.logoFile) {
-				const fd = new FormData();
-				fd.append("file", params.logoFile);
-				const res = await fetch("/api/upload", { method: "POST", body: fd });
-				const data = await res.json();
-				if (!res.ok) throw new Error((data as { error?: string }).error || "Logo upload failed");
-				logoUrl = (data as { url: string }).url;
-			}
+			// Upload logo (now required)
+			const logoFd = new FormData();
+			logoFd.append("file", params.logoFile);
+			const logoRes = await fetch("/api/upload", { method: "POST", body: logoFd });
+			const logoData = await logoRes.json();
+			if (!logoRes.ok) throw new Error((logoData as { error?: string }).error || "Logo upload failed");
+			const logoUrl = (logoData as { url: string }).url;
 
 			// Upload product reference if provided
+			let productRefUrl: string | undefined;
 			if (params.productRefFile) {
-				const fd = new FormData();
-				fd.append("file", params.productRefFile);
-				const res = await fetch("/api/upload", { method: "POST", body: fd });
-				const data = await res.json();
-				if (!res.ok) throw new Error((data as { error?: string }).error || "Product image upload failed");
-				productRefUrl = (data as { url: string }).url;
+				const productFd = new FormData();
+				productFd.append("file", params.productRefFile);
+				const productRes = await fetch("/api/upload", { method: "POST", body: productFd });
+				const productData = await productRes.json();
+				if (!productRes.ok) throw new Error((productData as { error?: string }).error || "Product image upload failed");
+				productRefUrl = (productData as { url: string }).url;
 			}
 
 			// Always call propose API to create project and concepts in database
 			const requestBody: Record<string, any> = {
 				brand: params.brand,
+				logoUrl: logoUrl,
 			};
 			
 			// Only add optional fields if they have values
-			if (logoUrl) requestBody.logoUrl = logoUrl;
 			if (params.productHint?.trim()) requestBody.product_hint = params.productHint.trim();
 			if (productRefUrl) requestBody.product_ref_url = productRefUrl;
 			
@@ -76,10 +76,10 @@ export default function HomePage() {
 						conceptId: c.id,
 						brand: params.brand,
 						promptBase: c.prompt_base,
+						logoUrl: logoUrl,
 					};
 					
 					// Only add optional fields if they have values
-					if (logoUrl) renderBody.logoUrl = logoUrl;
 					if (productRefUrl) renderBody.productRefUrl = productRefUrl;
 					
 					const res = await fetch("/api/render", {
@@ -106,9 +106,9 @@ export default function HomePage() {
 			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
 				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900">DumbGoodies</h1>
 				<p className="mt-3 text-sm sm:text-base text-gray-600">
-					Generate dumb merch images from your logo or brand name with AI. 
+					Generate dumb merch images from your logo with AI. 
 					<br className="hidden sm:block" />
-					Specify a product to generate the same item multiple times!
+					Upload a logo to get started!
 				</p>
 			</section>
 
@@ -118,33 +118,35 @@ export default function HomePage() {
 
 			{loading && (
 				<section className="text-center">
-					<div className="text-sm text-gray-600">Rendering your dumb goodies...</div>
+					<div className="text-sm text-gray-600">Generating your dumb goodies...</div>
 				</section>
 			)}
 
-			{concepts.length > 0 && (
-				<section className="grid gap-6">
-					{concepts.map((c) => (
-						<IdeaCard
-							key={c.id}
-							projectId={projectId ?? ""}
-							conceptId={c.id}
-							label={c.label}
-							results={resultsByConcept[c.id]}
-						/>
-					))}
+			{concepts.length > 0 && !loading && (
+				<section className="space-y-6">
+					<h2 className="text-xl font-semibold text-gray-900">Your Dumb Goodies</h2>
+					<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
+						{concepts.map((concept) => (
+							<IdeaCard
+								key={concept.id}
+								concept={concept}
+								results={resultsByConcept[concept.id] || []}
+								projectId={projectId!}
+							/>
+						))}
+					</div>
 				</section>
 			)}
 
 			{!loading && concepts.length === 0 && (
 				<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
 					<div className="card-neutral">
-						<h3 className="font-medium text-gray-900">AI Competition</h3>
-						<p className="text-sm text-gray-600 mt-1">Compare Seedream 4.0 vs OpenAI gpt-image-1 side-by-side for each concept.</p>
+						<h3 className="font-medium text-gray-900">AI-Powered Branding</h3>
+						<p className="text-sm text-gray-600 mt-1">DALL-E 3 generates products with your logo naturally integrated.</p>
 					</div>
 					<div className="card-neutral">
 						<h3 className="font-medium text-gray-900">Smart Placement</h3>
-						<p className="text-sm text-gray-600 mt-1">Logos are intelligently placed with proper perspective and realistic materials.</p>
+						<p className="text-sm text-gray-600 mt-1">Logos are placed realistically on product surfaces with proper perspective.</p>
 					</div>
 				</section>
 			)}

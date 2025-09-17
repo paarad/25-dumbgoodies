@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 type Props = {
 	onSubmit: (data: {
 		brand: string;
-		logoFile?: File | null;
+		logoFile: File;
 		productHint?: string | null;
 		productRefFile?: File | null;
 	}) => void;
@@ -24,8 +24,8 @@ export function BrandInput({ onSubmit }: Props) {
 		const file = e.target.files?.[0] || null;
 		setLogoFile(file);
 		
-		// Auto-extract brand name from filename if brand is empty
-		if (file && !brand.trim()) {
+		// Auto-extract brand name from filename
+		if (file) {
 			const filename = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
 			const brandName = filename
 				.replace(/[-_]/g, " ") // Replace dashes/underscores with spaces
@@ -40,82 +40,98 @@ export function BrandInput({ onSubmit }: Props) {
 		setProductFile(file);
 	}
 
-	async function handleSubmit(e: React.FormEvent) {
+	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setSubmitting(true);
-		try {
-			onSubmit({
-				brand,
-				logoFile,
-				productHint: productHint || null,
-				productRefFile: productFile,
-			});
-		} finally {
-			setSubmitting(false);
+		if (!logoFile) {
+			alert("Please upload a logo first!");
+			return;
 		}
+		if (!brand.trim()) {
+			alert("Please enter a brand name!");
+			return;
+		}
+		setSubmitting(true);
+		onSubmit({
+			brand: brand.trim(),
+			logoFile,
+			productHint: productHint.trim() || null,
+			productRefFile: productFile,
+		});
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-			<div className="flex items-stretch gap-2">
+		<form onSubmit={handleSubmit} className="flex flex-col gap-6">
+			<div className="space-y-3">
+				<div className="text-sm font-medium text-gray-900">1. Upload Your Logo</div>
+				<div className="flex items-stretch gap-2">
+					<input 
+						ref={logoRef} 
+						type="file" 
+						accept="image/png,image/svg+xml,image/jpeg" 
+						className="hidden" 
+						id="logo-input"
+						onChange={handleLogoChange}
+						required
+					/>
+					<label htmlFor="logo-input" className="button-secondary flex-1 justify-center">
+						{logoFile ? "✓ Logo Uploaded" : "Upload Logo (Required)"}
+					</label>
+				</div>
+				
+				{logoFile && (
+					<div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+						📎 Logo: {logoFile.name}
+					</div>
+				)}
+			</div>
+
+			<div className="space-y-3">
+				<div className="text-sm font-medium text-gray-900">2. Brand Name</div>
 				<input
 					value={brand}
 					onChange={(e) => setBrand(e.target.value)}
 					placeholder="Brand name (auto-filled from logo filename)"
-					className="flex-1 input-neutral"
+					className="w-full input-neutral"
 					required
 				/>
-				<input 
-					ref={logoRef} 
-					type="file" 
-					accept="image/png,image/svg+xml" 
-					className="hidden" 
-					id="logo-input"
-					onChange={handleLogoChange}
-				/>
-				<label htmlFor="logo-input" className="button-secondary">
-					{logoFile ? "✓ Logo" : "Upload Logo"}
-				</label>
-				<button disabled={submitting} className="button-primary">
-					{submitting ? "Working..." : "Go"}
-				</button>
 			</div>
-			
-			{logoFile && (
-				<div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-					📎 Logo: {logoFile.name}
+
+			<div className="space-y-3">
+				<div className="text-sm font-medium text-gray-900">3. Specific Product (Optional)</div>
+				<div className="flex items-stretch gap-2">
+					<input
+						value={productHint}
+						onChange={(e) => setProductHint(e.target.value)}
+						placeholder="Specific product (e.g., 'inflatable pool floatie', 'ceramic coffee mug')"
+						className="flex-1 input-neutral"
+					/>
+					<input 
+						ref={productRef} 
+						type="file" 
+						accept="image/*" 
+						className="hidden" 
+						id="product-input"
+						onChange={handleProductChange}
+					/>
+					<label htmlFor="product-input" className="button-secondary">
+						{productFile ? "✓ Product" : "Upload Product"}
+					</label>
 				</div>
-			)}
-			
-			<div className="flex items-stretch gap-2">
-				<input
-					value={productHint}
-					onChange={(e) => setProductHint(e.target.value)}
-					placeholder="Specific product (e.g., 'inflatable pool floatie', 'ceramic coffee mug', 'cotton t-shirt')"
-					className="flex-1 input-neutral"
-				/>
-				<input 
-					ref={productRef} 
-					type="file" 
-					accept="image/*" 
-					className="hidden" 
-					id="product-input"
-					onChange={handleProductChange}
-				/>
-				<label htmlFor="product-input" className="button-secondary">
-					{productFile ? "✓ Product" : "Upload Product"}
-				</label>
+				
+				{productFile && (
+					<div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+						📎 Product: {productFile.name}
+					</div>
+				)}
 			</div>
-			
-			{productFile && (
-				<div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-					📎 Product: {productFile.name}
-				</div>
-			)}
-			
+
 			<div className="text-xs text-gray-500">
-				💡 Upload a logo to auto-fill brand name • Leave product fields empty for 2 auto-generated ideas
+				💡 Upload a logo to get started • Leave product fields empty for 2 auto-generated ideas
 			</div>
+
+			<button type="submit" disabled={submitting || !logoFile} className="button-primary">
+				{submitting ? "Generating..." : "Generate Dumb Goodies"}
+			</button>
 		</form>
 	);
-} 
+}
