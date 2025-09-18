@@ -1,9 +1,11 @@
-import sharp from "sharp";
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function makeGuideAndMask(basePngBuf: Buffer, logoPngBuf: Buffer) {
+  // Lazy load Sharp to avoid startup crashes
+  const sharp = (await import("sharp")).default;
+  
   const base = sharp(basePngBuf).ensureAlpha();
   const meta = await base.metadata(); 
   const W = meta.width!, H = meta.height!;
