@@ -22,28 +22,15 @@ function validateBrand(brand: string): string {
 }
 
 async function generateWithLogo(brand: string, product: string, logoUrl: string) {
-  console.log(`[render-more] SHARP-FREE logo integration for ${product}`);
+  console.log(`[render-more] SIMPLIFIED logo integration for ${product}`);
   
-  // Step 1: Generate clean product (no branding)
-  const cleanPrompt = buildProductPrompt(brand, product, undefined, true); // hasLogoFile = true
-  const baseImageB64 = await generatePNG({ prompt: cleanPrompt, brand });
-  console.log(`[render-more] Generated clean product image`);
+  // Since integrateLogo now generates everything from scratch, we can skip the base image step
+  console.log(`[render-more] Skipping base image generation - integrateLogo handles everything`);
   
-  // Step 2: Upload base image to get URL (needed for DALL-E edit)
-  const baseBuffer = Buffer.from(baseImageB64, "base64");
-  const basePath = `temp/${Date.now()}-base.png`;
-  const baseImageUrl = await uploadBufferToStorage({
-    bucket: BUCKET_RENDERS,
-    path: basePath,
-    data: baseBuffer,
-    contentType: "image/png"
-  });
-  console.log(`[render-more] Uploaded base image:`, baseImageUrl);
-  
-  // Step 3: Integrate logo using DALL-E edit (NO SHARP!)
-  console.log(`[render-more] Integrating logo using DALL-E edit`);
+  // Step 1: Integrate logo using DALL-E generation (NO SHARP, NO BASE IMAGE!)
+  console.log(`[render-more] Integrating logo using DALL-E generation`);
   const integratedB64 = await integrateLogo({ 
-    baseImageUrl, 
+    baseImageUrl: "", // Not used anymore
     logoUrl, 
     product 
   });

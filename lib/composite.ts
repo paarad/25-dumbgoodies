@@ -2,8 +2,7 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-// NUCLEAR OPTION: Remove all Sharp dependencies
-// Just download the logo and use DALL-E edit directly with simple masking
+// SIMPLE APPROACH: Just regenerate the product with logo described in prompt
 export async function integrateLogo({ 
   baseImageUrl, 
   logoUrl, 
@@ -13,43 +12,51 @@ export async function integrateLogo({
   logoUrl: string; 
   product: string;
 }) {
-  console.log("[integrateLogo] SHARP-FREE integration starting");
+  console.log("[integrateLogo] Using simple generation approach instead of edit");
   
-  // Download base image
-  const baseResponse = await fetch(baseImageUrl);
-  if (!baseResponse.ok) throw new Error("Failed to download base image");
-  const baseBuffer = Buffer.from(await baseResponse.arrayBuffer());
-  
-  // Download logo
+  // Download logo to analyze it
   const logoResponse = await fetch(logoUrl);
   if (!logoResponse.ok) throw new Error("Failed to download logo");
   const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
   
-  console.log("[integrateLogo] Downloaded base and logo, sizes:", baseBuffer.length, logoBuffer.length);
+  // Detect if it's SVG and try to extract text content
+  let logoDescription = "a logo";
+  if (logoUrl.includes('.svg') || logoUrl.includes('svg')) {
+    const logoText = logoBuffer.toString('utf8');
+    // Try to extract text from SVG
+    const textMatch = logoText.match(/>([^<]+)</g);
+    if (textMatch) {
+      const extractedText = textMatch
+        .map(m => m.replace(/^>|<$/g, '').trim())
+        .filter(t => t.length > 0 && !t.includes('xmlns') && !t.includes('svg'))
+        .join(' ');
+      if (extractedText.length > 0 && extractedText.length < 50) {
+        logoDescription = `"${extractedText}" text logo`;
+      }
+    }
+  }
   
-  // Create simple prompt for DALL-E to integrate the logo
-  const prompt = `Add the uploaded logo to the center-front of this ${product}. 
-Integrate it realistically with proper perspective, lighting, and material response.
-Keep the logo proportions and make it look naturally applied (printed/embossed/embroidered as appropriate).
-Maintain transparent background. Product only, no environment.`;
-
-  console.log("[integrateLogo] Using DALL-E edit with prompt:", prompt);
+  console.log("[integrateLogo] Detected logo description:", logoDescription);
   
-  // Convert buffers to File objects for the API
-  const imageFile = new File([new Uint8Array(baseBuffer)], "base.png", { type: "image/png" });
-  const maskFile = new File([new Uint8Array(logoBuffer)], "logo.png", { type: "image/png" });
+  // Generate a new product image with the logo integrated
+  const prompt = `Single, isolated ${product}. Photorealistic studio packshot, centered.
+Add ${logoDescription} to the center-front area, integrated realistically with proper perspective and lighting.
+Make the logo look naturally applied (printed/embossed/embroidered as appropriate for the product material).
+Keep logo proportions readable and appropriately sized - not too large or too small.
+Transparent background (alpha). No environment, no platform/ground plane, no reflections, no duplicate objects, no people/hands, no extra text, no patterns, no watermarks. Product only.`;
 
-  const res = await openai.images.edit({
+  console.log("[integrateLogo] Generating new product with integrated logo");
+  
+  const res = await openai.images.generate({
     model: "gpt-image-1",
-    image: imageFile,
-    mask: maskFile, // Use logo as mask - DALL-E will figure it out
     prompt,
+    size: "1024x1024",
     output_format: "png",
   });
   
   const result = res.data?.[0]?.b64_json;
-  if (!result) throw new Error("Failed to get image data from DALL-E edit");
+  if (!result) throw new Error("Failed to get image data from DALL-E generation");
   
-  console.log("[integrateLogo] DALL-E integration complete");
+  console.log("[integrateLogo] Logo integration complete via generation");
   return result;
 } 
