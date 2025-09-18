@@ -3,9 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generatePNG } from "@/lib/openai";
 import { buildProductPrompt } from "@/lib/prompts";
 import { getTwoDumbIdeas } from "@/lib/ideas";
-import { createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
-import { makeGuideAndMask, integrateLogo } from "@/lib/composite";
 
 export const runtime = "nodejs";
 
@@ -62,11 +60,13 @@ async function generateWithLogo(brand: string, product: string, logoUrl: string)
   
   // Step 3: Create guide and mask
   console.log(`[generateWithLogo] Creating guide and mask`);
+  const { makeGuideAndMask } = await import("@/lib/composite");
   const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
   console.log(`[generateWithLogo] Created guide and mask`);
   
   // Step 4: Integrate logo using DALL-E edit
   console.log(`[generateWithLogo] Integrating logo using DALL-E edit`);
+  const { integrateLogo } = await import("@/lib/composite");
   const integratedB64 = await integrateLogo({ guide, mask, product });
   console.log(`[generateWithLogo] Logo integration complete`);
   
@@ -85,9 +85,11 @@ async function generateWithLogoOnProductRef(brand: string, productRefUrl: string
   const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
   
   // Step 3: Create guide and mask using the actual product image as base
+  const { makeGuideAndMask } = await import("@/lib/composite");
   const { guide, mask } = await makeGuideAndMask(productBuffer, logoBuffer);
   
   // Step 4: Integrate logo using DALL-E edit on the actual product
+  const { integrateLogo } = await import("@/lib/composite");
   const integratedB64 = await integrateLogo({ guide, mask, product: "uploaded product" });
   
   return integratedB64;
@@ -126,6 +128,7 @@ export async function POST(req: NextRequest) {
         const results = [];
         for (let i = 0; i < images.length; i++) {
           const buffer = Buffer.from(images[i], "base64");
+          const { toPng, createThumbnail } = await import("@/lib/images");
           const png = await toPng(buffer);
           const thumb = await createThumbnail(png, 512);
           const basePath = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-uploaded-${i}`;
@@ -157,6 +160,7 @@ export async function POST(req: NextRequest) {
       const results = [];
       for (let i = 0; i < images.length; i++) {
         const buffer = Buffer.from(images[i], "base64");
+        const { toPng, createThumbnail } = await import("@/lib/images");
         const png = await toPng(buffer);
         const thumb = await createThumbnail(png, 512);
         const basePath = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${i}`;
@@ -187,6 +191,7 @@ export async function POST(req: NextRequest) {
       
       // Convert to buffer and upload
       const buffer = Buffer.from(imageB64, "base64");
+      const { toPng, createThumbnail } = await import("@/lib/images");
       const png = await toPng(buffer);
       const thumb = await createThumbnail(png, 512);
       const basePath = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${idea.replace(/\s+/g, '-')}-0`;
