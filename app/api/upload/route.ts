@@ -5,9 +5,9 @@ import crypto from "node:crypto";
 
 export const runtime = "nodejs";
 
-// Debug endpoint to verify route is working
+// Debug endpoint to verify route is working - v2
 export async function GET() {
-	return new Response(JSON.stringify({ status: "Upload endpoint is working", method: "GET" }), { 
+	return new Response(JSON.stringify({ status: "Upload endpoint is working", method: "GET", version: "v2-with-detailed-logging" }), { 
 		status: 200, 
 		headers: { "content-type": "application/json" } 
 	});
@@ -15,10 +15,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
 	try {
-		console.log("[Upload] ===== UPLOAD REQUEST STARTED =====");
+		console.log("[Upload] ===== UPLOAD REQUEST STARTED v2 =====");
 		console.log("[Upload] Method:", req.method);
 		console.log("[Upload] URL:", req.url);
 		console.log("[Upload] Headers:", Object.fromEntries(req.headers.entries()));
+		console.log("[Upload] Timestamp:", new Date().toISOString());
 		
 		const contentType = req.headers.get("content-type") || "";
 		console.log("[Upload] Content-Type:", contentType);
