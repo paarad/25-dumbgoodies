@@ -1,0 +1,18 @@
+{
+  "functions": {
+    "app/api/render/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/render-more/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/upload/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "build": {
+    "env": {
+      "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
+    }
+  }
+} 
