@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { toPng } from "@/lib/images";
 import { BUCKET_UPLOADS, uploadBufferToStorage } from "@/lib/supabase";
 import crypto from "node:crypto";
 
@@ -60,6 +59,8 @@ export async function POST(req: NextRequest) {
 		console.log("[Upload] Converting to PNG with Sharp...");
 		let pngBuffer: Buffer;
 		try {
+			// Lazy load Sharp to avoid import-time failures
+			const { toPng } = await import("@/lib/images");
 			pngBuffer = await toPng(inputBuffer);
 			console.log("[Upload] Sharp conversion successful, size:", pngBuffer.length, "bytes");
 		} catch (sharpError) {
