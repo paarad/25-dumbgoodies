@@ -1,11 +1,11 @@
 // lib/openai.ts
 import OpenAI from "openai";
-import sharp from "sharp";
 
 export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 async function hasAlphaChannel(imageBuffer: Buffer): Promise<boolean> {
   try {
+    const sharp = (await import("sharp")).default;
     const metadata = await sharp(imageBuffer).metadata();
     return metadata.hasAlpha === true;
   } catch {
