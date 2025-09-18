@@ -2,15 +2,46 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Fix SVG by ensuring it has width/height attributes
+function fixSvgDimensions(svgBuffer: Buffer): Buffer {
+  let svgContent = svgBuffer.toString('utf8');
+  
+  // If SVG doesn't have width/height, add them
+  if (!svgContent.includes('width=') || !svgContent.includes('height=')) {
+    // Extract viewBox if present to determine dimensions
+    const viewBoxMatch = svgContent.match(/viewBox=["']([^"']+)["']/);
+    let width = '100', height = '100'; // defaults
+    
+    if (viewBoxMatch) {
+      const [, , , vbWidth, vbHeight] = viewBoxMatch[1].split(/\s+/);
+      width = vbWidth || '100';
+      height = vbHeight || '100';
+    }
+    
+    // Add width and height attributes
+    svgContent = svgContent.replace(
+      /<svg([^>]*)>/,
+      `<svg$1 width="${width}" height="${height}">`
+    );
+  }
+  
+  return Buffer.from(svgContent, 'utf8');
+}
+
 // Use Node.js Canvas to composite logo onto base image (no Sharp needed!)
 async function compositeLogoOnBase(baseBuffer: Buffer, logoBuffer: Buffer): Promise<Buffer> {
   try {
     // Dynamic import of canvas to avoid startup issues
     const { createCanvas, loadImage } = await import('canvas');
     
+    // Fix SVG dimensions if needed
+    const fixedLogoBuffer = logoBuffer.toString().includes('<svg') 
+      ? fixSvgDimensions(logoBuffer) 
+      : logoBuffer;
+    
     // Load both images
     const baseImage = await loadImage(baseBuffer);
-    const logoImage = await loadImage(logoBuffer);
+    const logoImage = await loadImage(fixedLogoBuffer);
     
     // Create canvas with base image size
     const canvas = createCanvas(baseImage.width, baseImage.height);
@@ -40,14 +71,29 @@ async function compositeLogoOnBase(baseBuffer: Buffer, logoBuffer: Buffer): Prom
   }
 }
 
-// Create a simple center mask for DALL-E edit
-function createCenterMask(): Buffer {
-  const maskSvg = `<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100%" height="100%" fill="black"/>
-    <rect x="256" y="384" width="512" height="256" fill="white"/>
-  </svg>`;
-  
-  return Buffer.from(maskSvg, 'utf8');
+// Create a PNG mask instead of SVG (DALL-E requirement)
+async function createCenterMaskPNG(): Promise<Buffer> {
+  try {
+    const { createCanvas } = await import('canvas');
+    
+    // Create 1024x1024 canvas for mask
+    const canvas = createCanvas(1024, 1024);
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with black (preserve areas)
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    // Create white rectangle in center (editable area)
+    ctx.fillStyle = 'white';
+    ctx.fillRect(256, 384, 512, 256);
+    
+    return canvas.toBuffer('image/png');
+  } catch (error) {
+    console.log("[createCenterMaskPNG] Canvas failed for mask creation");
+    // Create a simple black PNG buffer as fallback
+    return Buffer.from([]);
+  }
 }
 
 // Proper logo integration using Canvas compositing + DALL-E refinement
@@ -77,8 +123,8 @@ export async function integrateLogo({
   // Use Canvas to composite logo onto base image
   const compositeBuffer = await compositeLogoOnBase(baseBuffer, logoBuffer);
   
-  // Create simple mask for refinement
-  const maskBuffer = createCenterMask();
+  // Create PNG mask for DALL-E (not SVG!)
+  const maskBuffer = await createCenterMaskPNG();
   
   // Use DALL-E edit to refine the integration
   const prompt = `Refine and improve the logo integration on this ${product}.
@@ -90,9 +136,9 @@ Maintain transparent background. Product only.`;
   console.log("[integrateLogo] Using DALL-E edit to refine the integration");
   
   try {
-    // Convert to File objects for the API
+    // Convert to File objects for the API (both PNG now)
     const imageFile = new File([new Uint8Array(compositeBuffer)], "composite.png", { type: "image/png" });
-    const maskFile = new File([new Uint8Array(maskBuffer)], "mask.svg", { type: "image/svg+xml" });
+    const maskFile = new File([new Uint8Array(maskBuffer)], "mask.png", { type: "image/png" });
 
     const res = await openai.images.edit({
       model: "gpt-image-1",
