@@ -1,5 +1,12 @@
 import Replicate from "replicate";
-import type { GeneratedImage } from "./openai";
+
+type GeneratedImage = {
+  model?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  imageBuffer?: Buffer;
+  mimeType?: string;
+};
 
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 // Using Stable Diffusion XL for inpainting instead of Seedream

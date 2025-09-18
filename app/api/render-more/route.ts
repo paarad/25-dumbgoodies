@@ -36,7 +36,7 @@ async function generateWithLogo(brand: string, product: string, logoUrl: string)
   const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
   
   // Step 4: Integrate logo using DALL-E edit
-  const integratedB64 = await integrateLogo({ guide, mask, brand, product });
+  const integratedB64 = await integrateLogo({ guide, mask, product });
   
   return integratedB64;
 }

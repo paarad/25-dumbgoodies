@@ -57,22 +57,22 @@ export async function makeGuideAndMask(basePngBuf: Buffer, logoPngBuf: Buffer) {
 export async function integrateLogo({ 
   guide, 
   mask, 
-  brand, 
   product 
 }: {
   guide: Buffer; 
   mask: Buffer; 
-  brand: string; 
   product: string;
 }) {
   const prompt = `Keep everything identical except inside the transparent mask.
-Use the exact existing "${brand}" logo artwork already visible in the masked area; do NOT redesign or change it.
+Use ONLY the exact logo artwork already visible in the masked area; do NOT add any additional graphics, icons, or design elements.
+If it's text-only, keep it as text-only. If it has graphics, preserve those exactly as shown.
 Integrate it realistically onto the ${product}: correct perspective/curvature, lighting and material response (print/emboss/embroider as appropriate).
-Maintain logo proportions and legibility. Product only, transparent background. No extra text or labels.`;
+Maintain exact proportions and legibility. Product only, transparent background. 
+AVOID: adding symbols, icons, decorative elements, vector graphics, or any visual elements not present in the original logo.`;
 
   // Convert buffers to File objects for the API
-  const imageFile = new File([guide], "guide.png", { type: "image/png" });
-  const maskFile = new File([mask], "mask.png", { type: "image/png" });
+  const imageFile = new File([new Uint8Array(guide)], "guide.png", { type: "image/png" });
+  const maskFile = new File([new Uint8Array(mask)], "mask.png", { type: "image/png" });
 
   const res = await openai.images.edit({
     model: "gpt-image-1",
@@ -84,5 +84,7 @@ Maintain logo proportions and legibility. Product only, transparent background. 
     // input_fidelity: "high", // if your SDK exposes it
   });
   
-  return res.data?.[0]?.b64_json!;
+  const result = res.data?.[0]?.b64_json;
+  if (!result) throw new Error("Failed to get image data from DALL-E edit");
+  return result;
 } 

@@ -18,7 +18,6 @@ export default function Home() {
 	const [brand, setBrand] = useState<string>("");
 	const [logoUrl, setLogoUrl] = useState<string>("");
 	const [products, setProducts] = useState<ProductItem[]>([]);
-	const [generatingMore, setGeneratingMore] = useState(false);
 
 	async function handleStart(params: {
 		brand: string;
@@ -69,11 +68,19 @@ export default function Home() {
 					setBrand(params.brand);
 		setLogoUrl(logoUrl);
 
-		// Use new simplified render API - pass brand and logoUrl for proper logo integration
+		// Use new simplified render API - pass brand, logoUrl, and any product hints
+		const renderBody: any = { brand: params.brand, logoUrl };
+		if (params.productHint?.trim()) {
+			renderBody.product = params.productHint.trim();
+		}
+		if (productRefUrl) {
+			renderBody.productRefUrl = productRefUrl;
+		}
+		
 		const renderRes = await fetch("/api/render", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ brand: params.brand, logoUrl }),
+			body: JSON.stringify(renderBody),
 		});
 			const renderData = await renderRes.json();
 			if (!renderRes.ok || !renderData.items) throw new Error(renderData.error || "Render failed");
@@ -115,21 +122,18 @@ export default function Home() {
 					<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
 											{products.map((product, index) => (
 						<ProductCard
-							key={`${product.product}-${index}`}
+							key={`${product.product}-${index}-${product.images.length}`}
 							brand={brand}
 							product={product.product}
 							logoUrl={logoUrl}
 							images={product.images}
-							onGenerateMore={() => setGeneratingMore(true)}
 							onImageAdded={(newImage) => {
 								setProducts(prev => prev.map((p, i) => 
 									i === index 
 										? { ...p, images: [...p.images, newImage] }
 										: p
 								));
-								setGeneratingMore(false);
 							}}
-							generatingMore={generatingMore}
 						/>
 					))}
 					</div>

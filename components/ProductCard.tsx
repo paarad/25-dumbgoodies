@@ -11,9 +11,7 @@ type Props = {
     imageUrl: string;
     thumbnailUrl?: string;
   }>;
-  onGenerateMore: () => void;
   onImageAdded: (image: { model: string; imageUrl: string; thumbnailUrl?: string }) => void;
-  generatingMore?: boolean;
 };
 
 function ProductImageCard({ 
@@ -79,13 +77,12 @@ function ProductImageCard({
   );
 }
 
-export function ProductCard({ brand, product, logoUrl, images, onGenerateMore, onImageAdded, generatingMore }: Props) {
+export function ProductCard({ brand, product, logoUrl, images, onImageAdded }: Props) {
   const [localGenerating, setLocalGenerating] = useState(false);
 
   async function handleGenerateMore() {
     if (localGenerating) return;
     setLocalGenerating(true);
-    onGenerateMore(); // Notify parent that we're generating
     
     try {
       const res = await fetch("/api/render-more", {
@@ -110,10 +107,15 @@ export function ProductCard({ brand, product, logoUrl, images, onGenerateMore, o
     <div className="card-neutral">
       <div className="mb-4">
         <h3 className="font-medium text-lg">{product}</h3>
-        <p className="text-sm text-gray-600">Brand: {brand}</p>
       </div>
       
-      <div className="space-y-4">
+      <div className={`grid gap-4 ${
+        images.length === 1 
+          ? 'grid-cols-1' 
+          : images.length === 2 
+            ? 'grid-cols-1 md:grid-cols-2' 
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+      }`}>
         {images.map((image, index) => (
           <ProductImageCard
             key={`${image.imageUrl}-${index}`}
@@ -125,13 +127,15 @@ export function ProductCard({ brand, product, logoUrl, images, onGenerateMore, o
           />
         ))}
         
-        <button
-          onClick={handleGenerateMore}
-          disabled={localGenerating || generatingMore}
-          className="button-secondary w-full justify-center"
-        >
-          {localGenerating || generatingMore ? "Generating..." : "Generate One More"}
-        </button>
+        <div className="col-span-full">
+          <button
+            onClick={handleGenerateMore}
+            disabled={localGenerating}
+            className="button-secondary w-full justify-center"
+          >
+            {localGenerating ? "Generating..." : "Generate One More"}
+          </button>
+        </div>
       </div>
     </div>
   );
