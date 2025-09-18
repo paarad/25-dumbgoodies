@@ -65,23 +65,23 @@ export default function Home() {
 			const data = await res.json();
 			if (!res.ok) throw new Error((data as { error?: string }).error || "Propose failed");
 			
-					setBrand(params.brand);
-		setLogoUrl(logoUrl);
+			setBrand(params.brand);
+			setLogoUrl(logoUrl);
 
-		// Use new simplified render API - pass brand, logoUrl, and any product hints
-		const renderBody: any = { brand: params.brand, logoUrl };
-		if (params.productHint?.trim()) {
-			renderBody.product = params.productHint.trim();
-		}
-		if (productRefUrl) {
-			renderBody.productRefUrl = productRefUrl;
-		}
-		
-		const renderRes = await fetch("/api/render", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify(renderBody),
-		});
+			// Use new simplified render API - pass brand, logoUrl, and any product hints
+			const renderBody: any = { brand: params.brand, logoUrl };
+			if (params.productHint?.trim()) {
+				renderBody.product = params.productHint.trim();
+			}
+			if (productRefUrl) {
+				renderBody.productRefUrl = productRefUrl;
+			}
+			
+			const renderRes = await fetch("/api/render", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(renderBody),
+			});
 			const renderData = await renderRes.json();
 			if (!renderRes.ok || !renderData.items) throw new Error(renderData.error || "Render failed");
 			
@@ -96,62 +96,67 @@ export default function Home() {
 	}
 
 	return (
-		<div className="font-sans min-h-screen p-6 sm:p-10 max-w-5xl mx-auto flex flex-col gap-8">
-			<section className="pt-8 sm:pt-16 pb-2 sm:pb-4 text-center">
-				<h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900">DumbGoodies</h1>
-				<p className="mt-3 text-sm sm:text-base text-gray-600">
-					Generate dumb merch images from your logo with AI. 
-					<br className="hidden sm:block" />
-					Upload a logo to get started!
+		<div className="min-h-screen bg-gray-50">
+			{/* Production Issue Banner */}
+			<div className="bg-yellow-400 text-black py-3 text-center">
+				<p className="text-sm font-medium">
+					⚠️ This project is currently experiencing issues in production and will be fixed soon. Thank you for your patience! ⚠️
 				</p>
-			</section>
+			</div>
 
-			<section className="card-neutral">
+			{/* Rest of the page */}
+			<div className="max-w-4xl mx-auto px-4 py-8">
+				<header className="text-center mb-12">
+					<h1 className="text-4xl font-bold text-gray-900 mb-4">Dumb Goodies</h1>
+					<p className="text-xl text-gray-600">AI-powered custom merch generator</p>
+				</header>
+
 				<BrandInput onSubmit={handleStart} />
-			</section>
 
-			{loading && (
-				<section className="text-center">
-					<div className="text-sm text-gray-600">Generating your dumb goodies...</div>
-				</section>
-			)}
+				{loading && (
+					<section className="text-center py-12">
+						<div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+						<p className="text-gray-600">Generating your dumb goodies...</p>
+					</section>
+				)}
 
-			{products.length > 0 && !loading && (
-				<section className="space-y-6">
-					<h2 className="text-xl font-semibold text-gray-900">Your Dumb Goodies</h2>
-					<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
-											{products.map((product, index) => (
-						<ProductCard
-							key={`${product.product}-${index}-${product.images.length}`}
-							brand={brand}
-							product={product.product}
-							logoUrl={logoUrl}
-							images={product.images}
-							onImageAdded={(newImage) => {
-								setProducts(prev => prev.map((p, i) => 
-									i === index 
-										? { ...p, images: [...p.images, newImage] }
-										: p
-								));
-							}}
-						/>
-					))}
-					</div>
-				</section>
-			)}
+				{products.length > 0 && !loading && (
+					<section className="space-y-6">
+						<h2 className="text-xl font-semibold text-gray-900">Your Dumb Goodies</h2>
+						<div className="grid gap-6 sm:gap-8 sm:grid-cols-2">
+							{products.map((product, index) => (
+								<ProductCard
+									key={`${product.product}-${index}-${product.images.length}`}
+									brand={brand}
+									product={product.product}
+									logoUrl={logoUrl}
+									images={product.images}
+									onImageAdded={(newImage) => {
+										setProducts(prev => prev.map((p, i) => 
+											i === index 
+												? { ...p, images: [...p.images, newImage] }
+												: p
+										));
+									}}
+								/>
+							))}
+						</div>
+					</section>
+				)}
 
-			{!loading && products.length === 0 && (
-				<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
-					<div className="card-neutral">
-						<h3 className="font-medium text-gray-900">AI-Powered Branding</h3>
-						<p className="text-sm text-gray-600 mt-1">DALL-E 3 generates products with your logo naturally integrated.</p>
-					</div>
-					<div className="card-neutral">
-						<h3 className="font-medium text-gray-900">Smart Placement</h3>
-						<p className="text-sm text-gray-600 mt-1">Logos are placed realistically on product surfaces with proper perspective.</p>
-					</div>
-				</section>
-			)}
+				{!loading && products.length === 0 && (
+					<section className="grid gap-6 sm:gap-8 sm:grid-cols-2 mt-2 sm:mt-4">
+						<div className="card-neutral">
+							<h3 className="font-medium text-gray-900">AI-Powered Branding</h3>
+							<p className="text-sm text-gray-600 mt-1">DALL-E 3 generates products with your logo naturally integrated.</p>
+						</div>
+						<div className="card-neutral">
+							<h3 className="font-medium text-gray-900">Smart Placement</h3>
+							<p className="text-sm text-gray-600 mt-1">Logos are placed realistically on product surfaces with proper perspective.</p>
+						</div>
+					</section>
+				)}
+			</div>
 		</div>
 	);
 }
