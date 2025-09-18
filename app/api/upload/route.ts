@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { toPng } from "@/lib/images";
 import { BUCKET_UPLOADS, uploadBufferToStorage } from "@/lib/supabase";
 import crypto from "node:crypto";
 
@@ -35,28 +34,20 @@ export async function POST(req: NextRequest) {
 		const arrayBuffer = await file.arrayBuffer();
 		const inputBuffer = Buffer.from(arrayBuffer);
 		
-		console.log("[Upload] Converting to PNG...");
-		let pngBuffer: Buffer;
-		try {
-			// Try Sharp conversion first
-			pngBuffer = await toPng(inputBuffer);
-			console.log("[Upload] PNG conversion successful, size:", pngBuffer.length, "bytes");
-		} catch (sharpError) {
-			console.error("[Upload] Sharp conversion failed:", sharpError);
-			// Fallback: use original buffer if it's already a supported format
-			console.log("[Upload] Using original buffer as fallback");
-			pngBuffer = inputBuffer;
-		}
+		console.log("[Upload] Using original image buffer (bypassing Sharp conversion for production stability)");
+		const pngBuffer = inputBuffer; // Use original buffer directly
+		console.log("[Upload] Buffer ready, size:", pngBuffer.length, "bytes");
 
 		const id = crypto.randomUUID();
-		const path = `${new Date().toISOString().slice(0, 10)}/${id}.png`;
+		const fileExt = file.type === "image/svg+xml" ? "svg" : "png";
+		const path = `${new Date().toISOString().slice(0, 10)}/${id}.${fileExt}`;
 		
-		console.log("[Upload] Uploading to Supabase:", path);
+		console.log("[Upload] Uploading to Supabase:", path, "Type:", file.type);
 		const url = await uploadBufferToStorage({
 			bucket: BUCKET_UPLOADS,
 			path,
 			data: pngBuffer,
-			contentType: "image/png",
+			contentType: file.type || "image/png",
 		});
 
 		console.log("[Upload] Upload successful:", url);
