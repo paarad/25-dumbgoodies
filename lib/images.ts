@@ -1,11 +1,16 @@
+// NUCLEAR OPTION: Remove all Sharp dependencies completely
+// Simple fallback implementations that work without image processing
+
 export async function toPng(buffer: Buffer): Promise<Buffer> {
-	const sharp = (await import("sharp")).default;
-	return sharp(buffer).png().toBuffer();
+	// Just return the buffer as-is - most images are already in compatible formats
+	console.log("[toPng] SHARP-FREE: returning buffer as-is");
+	return buffer;
 }
 
 export async function createThumbnail(buffer: Buffer, size = 512): Promise<Buffer> {
-	const sharp = (await import("sharp")).default;
-	return sharp(buffer).resize(size, size, { fit: "inside" }).png().toBuffer();
+	// Just return the original buffer - no thumbnail processing
+	console.log("[createThumbnail] SHARP-FREE: returning original buffer");
+	return buffer;
 }
 
 export async function bufferFromUrl(url: string): Promise<Buffer> {

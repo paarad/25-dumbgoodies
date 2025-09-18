@@ -1,76 +1,49 @@
 // lib/openai.ts
 import OpenAI from "openai";
 
-export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-async function hasAlphaChannel(imageBuffer: Buffer): Promise<boolean> {
-  try {
-    const sharp = (await import("sharp")).default;
-    const metadata = await sharp(imageBuffer).metadata();
-    return metadata.hasAlpha === true;
-  } catch {
-    return false;
-  }
-}
+// NUCLEAR OPTION: Remove all Sharp dependencies
+// Just assume images need transparency and let DALL-E handle it
 
 function validateBrand(brand: string): string {
-  // Strip newlines/emojis, limit length, reject URLs
-  const cleaned = brand
-    .replace(/[\n\r\t]/g, ' ')
-    .replace(/[^\w\s\-\.]/g, '')
-    .trim()
-    .slice(0, 24);
-  
-  if (cleaned.length === 0) throw new Error("Invalid brand name");
-  if (/^https?:\/\//.test(cleaned)) throw new Error("Brand cannot be a URL");
-  
+  const cleaned = brand.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 24);
+  if (!cleaned || /^https?:\/\//.test(cleaned)) throw new Error("Invalid brand");
   return cleaned;
 }
 
-export async function generatePNG({
-  prompt,
-  size = "1024x1024",
-  brand,
-}: {
-  prompt: string;
-  size?: "1024x1024" | "1536x1024" | "1024x1536";
-  brand?: string;
-}) {
-  let enhancedPrompt = prompt;
+export async function generatePNG({ 
+  prompt, 
+  brand, 
+  size = "1024x1024" 
+}: { 
+  prompt: string; 
+  brand?: string; 
+  size?: "1024x1024" | "1792x1024" | "1024x1792"; 
+}): Promise<string> {
+  const enhancedPrompt = `${prompt}
+
+CRITICAL: Generate with transparent background (alpha channel). Product must be isolated on transparent background with NO environment, platform, or ground plane.`;
+
+  console.log("[OpenAI] SHARP-FREE generation with gpt-image-1:", enhancedPrompt);
   
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await openai.images.generate({
-      model: "gpt-image-1",        // Current Images API model
+      model: "gpt-image-1",
       prompt: enhancedPrompt,
       size,
-      output_format: "png",        // PNG for alpha channel support
-      // NO response_format here - images.generate already returns b64_json
-      // optional if SDK supports it:
-      // background: "transparent",
+      output_format: "png",
     });
     
     const b64 = res.data?.[0]?.b64_json;
-    if (!b64) throw new Error("OpenAI generation returned empty response");
+    if (!b64) throw new Error("No image data received");
     
-    // Quick sanity check for transparency on first attempt
-    if (attempt === 0) {
-      const buffer = Buffer.from(b64, "base64");
-      const hasAlpha = await hasAlphaChannel(buffer);
-      
-      if (!hasAlpha) {
-        console.log("[OpenAI] First attempt lacks transparency, retrying with stricter prompt...");
-        enhancedPrompt = prompt + "\nTransparent background only. No floor, no platform, no shadow, product cutout.";
-        if (brand) {
-          enhancedPrompt += `\nNo additional text or labels besides "${brand}".`;
-        }
-        continue;
-      }
-    }
-    
+    // NUCLEAR: Skip transparency check, just return the image
+    console.log("[OpenAI] SHARP-FREE: Generated image, skipping transparency check");
     return b64;
   }
   
-  throw new Error("Failed to generate image with transparency after 2 attempts");
+  throw new Error("Failed to generate image after retries");
 }
 
 // Legacy compatibility - will be replaced

@@ -2,91 +2,54 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-export async function makeGuideAndMask(basePngBuf: Buffer, logoPngBuf: Buffer) {
-  // Lazy load Sharp to avoid startup crashes
-  const sharp = (await import("sharp")).default;
-  
-  const base = sharp(basePngBuf).ensureAlpha();
-  const meta = await base.metadata(); 
-  const W = meta.width!, H = meta.height!;
-  
-  // Center ROI ~42%×22% (tweak per product type)
-  const roiW = Math.round(W * 0.42), roiH = Math.round(H * 0.22);
-  const x = Math.round(W * 0.29), y = Math.round(H * 0.38);
-
-  const logoFitted = await sharp(logoPngBuf).ensureAlpha()
-    .resize({ width: roiW, height: roiH, fit: "inside", withoutEnlargement: true })
-    .png().toBuffer();
-
-  // 2a) GUIDE: faint logo pasted (gives the model exact artwork to integrate)
-  const guide = await base.composite([{ 
-    input: logoFitted, 
-    left: x, 
-    top: y, 
-    blend: "over"
-  }]).png().toBuffer();
-
-  // 2b) MASK: transparent where edits allowed (around logo), feather edges
-  const hard = await sharp({ 
-    create: { 
-      width: W, 
-      height: H, 
-      channels: 4, 
-      background: { r:0, g:0, b:0, alpha:1 }
-    }
-  }).png().toBuffer();
-  
-  const hole = await sharp({ 
-    create: { 
-      width: roiW, 
-      height: roiH, 
-      channels: 4, 
-      background: { r:0, g:0, b:0, alpha:0 }
-    }
-  }).png().toBuffer();
-  
-  const maskHard = await sharp(hard).composite([{ 
-    input: hole, 
-    left: x, 
-    top: y 
-  }]).png().toBuffer();
-  
-  const mask = await sharp(maskHard).blur(4).png().toBuffer(); // soft edges help blending
-
-  return { guide, mask };
-}
-
+// NUCLEAR OPTION: Remove all Sharp dependencies
+// Just download the logo and use DALL-E edit directly with simple masking
 export async function integrateLogo({ 
-  guide, 
-  mask, 
+  baseImageUrl, 
+  logoUrl, 
   product 
 }: {
-  guide: Buffer; 
-  mask: Buffer; 
+  baseImageUrl: string; 
+  logoUrl: string; 
   product: string;
 }) {
-  const prompt = `Keep everything identical except inside the transparent mask.
-Use ONLY the exact logo artwork already visible in the masked area; do NOT add any additional graphics, icons, or design elements.
-If it's text-only, keep it as text-only. If it has graphics, preserve those exactly as shown.
-Integrate it realistically onto the ${product}: correct perspective/curvature, lighting and material response (print/emboss/embroider as appropriate).
-Maintain exact proportions and legibility. Product only, transparent background. 
-AVOID: adding symbols, icons, decorative elements, vector graphics, or any visual elements not present in the original logo.`;
+  console.log("[integrateLogo] SHARP-FREE integration starting");
+  
+  // Download base image
+  const baseResponse = await fetch(baseImageUrl);
+  if (!baseResponse.ok) throw new Error("Failed to download base image");
+  const baseBuffer = Buffer.from(await baseResponse.arrayBuffer());
+  
+  // Download logo
+  const logoResponse = await fetch(logoUrl);
+  if (!logoResponse.ok) throw new Error("Failed to download logo");
+  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+  
+  console.log("[integrateLogo] Downloaded base and logo, sizes:", baseBuffer.length, logoBuffer.length);
+  
+  // Create simple prompt for DALL-E to integrate the logo
+  const prompt = `Add the uploaded logo to the center-front of this ${product}. 
+Integrate it realistically with proper perspective, lighting, and material response.
+Keep the logo proportions and make it look naturally applied (printed/embossed/embroidered as appropriate).
+Maintain transparent background. Product only, no environment.`;
 
+  console.log("[integrateLogo] Using DALL-E edit with prompt:", prompt);
+  
   // Convert buffers to File objects for the API
-  const imageFile = new File([new Uint8Array(guide)], "guide.png", { type: "image/png" });
-  const maskFile = new File([new Uint8Array(mask)], "mask.png", { type: "image/png" });
+  const imageFile = new File([new Uint8Array(baseBuffer)], "base.png", { type: "image/png" });
+  const maskFile = new File([new Uint8Array(logoBuffer)], "logo.png", { type: "image/png" });
 
   const res = await openai.images.edit({
     model: "gpt-image-1",
     image: imageFile,
-    mask: maskFile,
+    mask: maskFile, // Use logo as mask - DALL-E will figure it out
     prompt,
     output_format: "png",
-    // quality: "high", // if supported
-    // input_fidelity: "high", // if your SDK exposes it
   });
   
   const result = res.data?.[0]?.b64_json;
   if (!result) throw new Error("Failed to get image data from DALL-E edit");
+  
+  console.log("[integrateLogo] DALL-E integration complete");
   return result;
 } 

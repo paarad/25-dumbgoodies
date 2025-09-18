@@ -42,55 +42,53 @@ function validateBrand(brand: string): string {
 }
 
 async function generateWithLogo(brand: string, product: string, logoUrl: string) {
-  console.log(`[generateWithLogo] Starting logo integration for ${product}`);
+  console.log(`[generateWithLogo] SHARP-FREE logo integration for ${product}`);
   
   // Step 1: Generate clean product (no branding)
   const cleanPrompt = buildProductPrompt(brand, product, undefined, true); // hasLogoFile = true
   console.log(`[generateWithLogo] Clean prompt:`, cleanPrompt);
   const baseImageB64 = await generatePNG({ prompt: cleanPrompt }); // No brand for clean product
-  const baseBuffer = Buffer.from(baseImageB64, "base64");
   console.log(`[generateWithLogo] Generated clean product image`);
   
-  // Step 2: Download logo
-  console.log(`[generateWithLogo] Downloading logo from:`, logoUrl);
-  const logoResponse = await fetch(logoUrl);
-  if (!logoResponse.ok) throw new Error("Failed to download logo");
-  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-  console.log(`[generateWithLogo] Downloaded logo, size:`, logoBuffer.length, 'bytes');
+  // Step 2: Upload base image to get URL (needed for DALL-E edit)
+  const baseBuffer = Buffer.from(baseImageB64, "base64");
+  const basePath = `temp/${Date.now()}-base.png`;
+  const baseImageUrl = await uploadBufferToStorage({
+    bucket: BUCKET_RENDERS,
+    path: basePath,
+    data: baseBuffer,
+    contentType: "image/png"
+  });
+  console.log(`[generateWithLogo] Uploaded base image:`, baseImageUrl);
   
-  // Step 3: Create guide and mask
-  console.log(`[generateWithLogo] Creating guide and mask`);
-  const { makeGuideAndMask } = await import("@/lib/composite");
-  const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
-  console.log(`[generateWithLogo] Created guide and mask`);
-  
-  // Step 4: Integrate logo using DALL-E edit
+  // Step 3: Integrate logo using DALL-E edit (NO SHARP!)
   console.log(`[generateWithLogo] Integrating logo using DALL-E edit`);
   const { integrateLogo } = await import("@/lib/composite");
-  const integratedB64 = await integrateLogo({ guide, mask, product });
+  const integratedB64 = await integrateLogo({ 
+    baseImageUrl, 
+    logoUrl, 
+    product 
+  });
   console.log(`[generateWithLogo] Logo integration complete`);
   
   return integratedB64;
 }
 
 async function generateWithLogoOnProductRef(brand: string, productRefUrl: string, logoUrl: string) {
-  // Step 1: Download the product reference image
-  const productResponse = await fetch(productRefUrl);
-  if (!productResponse.ok) throw new Error("Failed to download product reference");
-  const productBuffer = Buffer.from(await productResponse.arrayBuffer());
+  console.log(`[generateWithLogoOnProductRef] SHARP-FREE logo integration on product ref for ${brand}`);
   
-  // Step 2: Download logo
-  const logoResponse = await fetch(logoUrl);
-  if (!logoResponse.ok) throw new Error("Failed to download logo");
-  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+  // Step 1: Use the product reference image directly (already uploaded)
+  console.log("[generateWithLogoOnProductRef] Using product reference:", productRefUrl);
   
-  // Step 3: Create guide and mask using the actual product image as base
-  const { makeGuideAndMask } = await import("@/lib/composite");
-  const { guide, mask } = await makeGuideAndMask(productBuffer, logoBuffer);
-  
-  // Step 4: Integrate logo using DALL-E edit on the actual product
+  // Step 2: Integrate logo using DALL-E edit (NO SHARP!)
+  console.log("[generateWithLogoOnProductRef] Integrating logo using DALL-E edit");
   const { integrateLogo } = await import("@/lib/composite");
-  const integratedB64 = await integrateLogo({ guide, mask, product: "uploaded product" });
+  const integratedB64 = await integrateLogo({ 
+    baseImageUrl: productRefUrl, 
+    logoUrl, 
+    product: "uploaded product" 
+  });
+  console.log("[generateWithLogoOnProductRef] Logo integration complete");
   
   return integratedB64;
 }

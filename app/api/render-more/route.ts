@@ -4,7 +4,7 @@ import { generatePNG } from "@/lib/openai";
 import { buildProductPrompt } from "@/lib/prompts";
 import { createThumbnail, toPng } from "@/lib/images";
 import { BUCKET_RENDERS, BUCKET_THUMBS, uploadBufferToStorage } from "@/lib/supabase";
-import { makeGuideAndMask, integrateLogo } from "@/lib/composite";
+import { integrateLogo } from "@/lib/composite";
 
 export const runtime = "nodejs";
 
@@ -22,21 +22,32 @@ function validateBrand(brand: string): string {
 }
 
 async function generateWithLogo(brand: string, product: string, logoUrl: string) {
+  console.log(`[render-more] SHARP-FREE logo integration for ${product}`);
+  
   // Step 1: Generate clean product (no branding)
   const cleanPrompt = buildProductPrompt(brand, product, undefined, true); // hasLogoFile = true
   const baseImageB64 = await generatePNG({ prompt: cleanPrompt, brand });
+  console.log(`[render-more] Generated clean product image`);
+  
+  // Step 2: Upload base image to get URL (needed for DALL-E edit)
   const baseBuffer = Buffer.from(baseImageB64, "base64");
+  const basePath = `temp/${Date.now()}-base.png`;
+  const baseImageUrl = await uploadBufferToStorage({
+    bucket: BUCKET_RENDERS,
+    path: basePath,
+    data: baseBuffer,
+    contentType: "image/png"
+  });
+  console.log(`[render-more] Uploaded base image:`, baseImageUrl);
   
-  // Step 2: Download logo
-  const logoResponse = await fetch(logoUrl);
-  if (!logoResponse.ok) throw new Error("Failed to download logo");
-  const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-  
-  // Step 3: Create guide and mask
-  const { guide, mask } = await makeGuideAndMask(baseBuffer, logoBuffer);
-  
-  // Step 4: Integrate logo using DALL-E edit
-  const integratedB64 = await integrateLogo({ guide, mask, product });
+  // Step 3: Integrate logo using DALL-E edit (NO SHARP!)
+  console.log(`[render-more] Integrating logo using DALL-E edit`);
+  const integratedB64 = await integrateLogo({ 
+    baseImageUrl, 
+    logoUrl, 
+    product 
+  });
+  console.log(`[render-more] Logo integration complete`);
   
   return integratedB64;
 }

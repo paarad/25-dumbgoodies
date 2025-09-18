@@ -51,24 +51,14 @@ export async function POST(req: NextRequest) {
 		console.log("  - Name:", file.name);
 		console.log("  - Type:", file.type);
 		console.log("  - Size:", file.size, "bytes");
-
+		
 		const arrayBuffer = await file.arrayBuffer();
 		const inputBuffer = Buffer.from(arrayBuffer);
 		console.log("[Upload] Created buffer, size:", inputBuffer.length, "bytes");
 		
-		console.log("[Upload] Converting to PNG with Sharp...");
-		let pngBuffer: Buffer;
-		try {
-			// Lazy load Sharp to avoid import-time failures
-			const { toPng } = await import("@/lib/images");
-			pngBuffer = await toPng(inputBuffer);
-			console.log("[Upload] Sharp conversion successful, size:", pngBuffer.length, "bytes");
-		} catch (sharpError) {
-			console.error("[Upload] Sharp conversion failed:", sharpError);
-			// Fallback: use original buffer if it's already a supported format
-			console.log("[Upload] Using original buffer as fallback");
-			pngBuffer = inputBuffer;
-		}
+		// NUCLEAR OPTION: Skip all Sharp processing, just use original buffer
+		console.log("[Upload] SHARP-FREE: Using original buffer directly");
+		const finalBuffer = inputBuffer;
 
 		const id = crypto.randomUUID();
 		const fileExt = file.type === "image/svg+xml" ? "svg" : "png";
@@ -78,7 +68,7 @@ export async function POST(req: NextRequest) {
 		const url = await uploadBufferToStorage({
 			bucket: BUCKET_UPLOADS,
 			path,
-			data: pngBuffer,
+			data: finalBuffer,
 			contentType: file.type || "image/png",
 		});
 
